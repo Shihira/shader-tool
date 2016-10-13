@@ -5,7 +5,7 @@
 
 namespace shrtool {
 
-class error_base : std::exception {
+class error_base : public std::exception {
 public:
     std::string reason;
     error_base(const std::string& r) : reason(r) { }
@@ -19,6 +19,9 @@ public:
     };
 
 DEFINE_TRIVIAL_ERROR(assert_error)
+DEFINE_TRIVIAL_ERROR(shader_error)
+DEFINE_TRIVIAL_ERROR(driver_error)
+DEFINE_TRIVIAL_ERROR(enum_map_error)
 
 }
 

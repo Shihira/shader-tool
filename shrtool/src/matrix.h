@@ -777,6 +777,22 @@ inline mat4 perspective(double fov, double wh, double zn, double zf)
     };
 }
 
+inline mat4 orthographic(
+        double l, double r,
+        double t, double b,
+        double n, double f)
+{
+    double  r_l = r - l,
+            t_b = t - b,
+            f_n = f - n;
+    return mat4 {
+        2/r_l, 0, 0, -(r+l)/r_l,
+        0, 2/t_b, 0, -(t+b)/t_b,
+        0, 0, 2/f_n, -(f+n)/f_n,
+        0, 0, 0, 1,
+    };
+}
+
 }
 
 }

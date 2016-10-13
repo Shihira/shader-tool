@@ -1,5 +1,7 @@
-#include "../src/unit_test.h"
-#include "../src/matrix.h"
+#define TEST_SUITE "test_matrix"
+
+#include "unit_test.h"
+#include "matrix.h"
 
 /*
  * TIPS:
@@ -357,12 +359,9 @@ TEST_CASE(mat_inverse) {
     assert_true(ans2.close(res2, 0.000001));
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-    bool status = unit_test::test_context::test_all();
-    cout << unit_test::test_context::inst().full_log.str();
-
-    return status ? 0 : -1;
+    return unit_test::test_main(argc, argv);
 }
 
 

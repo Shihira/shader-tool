@@ -265,6 +265,17 @@ inline int test_main(int argc, char* argv[]) {
     } \
 }
 
+#define assert_except(expr, exc) { \
+    bool correct_exc = false; \
+    try { expr; } \
+    catch(exc e) { correct_exc = true; } \
+    /* catch(...) { } */ \
+    if(!correct_exc) { \
+        throw assert_error("Exception " #exc \
+                " was not catched in `" #expr "`"); \
+    } \
+}
+
 #define assert_float_equal(expr1, expr2) \
     assert_float_close(expr1, expr2, 0.00001)
 

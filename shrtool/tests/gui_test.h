@@ -81,16 +81,12 @@ public:
 
     void main_loop() {
         state = RUNNING;
-        while(state != FINISHED) {
+        while(state != FINISHED &&
+                glfwWindowShouldClose(gui_test_context::inst().window)) {
             do_update();
             do_draw();
             glfwSwapBuffers(gui_test_context::inst().window);
             glfwPollEvents();
-
-            // it would be better to put close detect after the first draw
-            // or there may trigger some segfault.
-            if(glfwWindowShouldClose(gui_test_context::inst().window))
-                break;
         }
     }
 };

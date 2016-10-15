@@ -359,6 +359,29 @@ TEST_CASE(mat_inverse) {
     assert_true(ans2.close(res2, 0.000001));
 }
 
+TEST_CASE(vec_multiply) {
+    col4 col_vec_1 = { 1, 2, 3, 4 };
+    row4 row_vec_1 = { 4, 5, 6, 7 };
+    col4 col_vec_2 = { 4, 5, 6, 7 };
+
+    assert_equal_print(dot(col_vec_1, row_vec_1), dot(col_vec_1, col_vec_2));
+    assert_equal_print(dot(col_vec_1, row_vec_1), (4 + 10 + 18 + 28));
+
+    col3 col_vec_3 = { 1, 2, 3 };
+    row3 row_vec_2 = { 4, 5, 6 };
+    col3 col_vec_4 = { 4, 5, 6 };
+
+    assert_equal_print(
+        cross(col_vec_3, row_vec_2),
+        cross(col_vec_3, col_vec_4));
+    assert_equal_print(
+        cross(col_vec_3, row_vec_2),
+        col3({12 - 15, 12 - 6, 5 - 8}));
+    assert_equal_print(
+        cross(col_vec_4, row_vec_2),
+        col3({0, 0, 0}));
+}
+
 int main(int argc, char* argv[])
 {
     return unit_test::test_main(argc, argv);

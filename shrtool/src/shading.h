@@ -32,10 +32,7 @@ public:
 
     // function render_Texture may alter viewport
     void render_texture(buffer_attachment ba, render_assets::texture2d& tex);
-    void set_viewport(size_t x, size_t y, size_t w, size_t h) {
-        _viewport[0] = x; _viewport[1] = y;
-        _viewport[2] = w; _viewport[3] = h;
-    }
+    void set_viewport(size_t x, size_t y, size_t w, size_t h);
     void clear_buffer(buffer_attachment ba);
     void initial_depth(float d) { _init_depth = d; }
     void initial_color(float r, float g, float b, float a) {

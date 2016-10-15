@@ -72,6 +72,15 @@ void vertex_attr_vector::destroy_object(id_type i) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void render_target::set_viewport(size_t x, size_t y, size_t w, size_t h) {
+    _viewport[0] = x; _viewport[1] = y;
+    _viewport[2] = w; _viewport[3] = h;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, id());
+    glViewport(x, y, w, h);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+}
+
 void render_target::render_texture(
         render_target::buffer_attachment ba,
         render_assets::texture2d &tex) {

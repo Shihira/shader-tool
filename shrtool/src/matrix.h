@@ -22,6 +22,11 @@ namespace math {
 
 namespace detail {
 
+template<typename T>
+constexpr T mpl_max__(T t1, T t2) { return (t1 > t2) ? t1 : t2; }
+template<typename T>
+constexpr T mpl_min__(T t1, T t2) { return (t1 < t2) ? t1 : t2; }
+
 #define CSELF (*(ExtType const*)(this))
 #define MSELF (*(ExtType*)(this))
 #define SELF CSELF
@@ -407,7 +412,8 @@ public:
     matrix(const matrix& m)
         : data_(new container_type)
         { std::copy(m.begin(), m.end(), begin()); }
-    template<typename OtherT> matrix(const matrix<OtherT, M, N>& m)
+    template<typename OtherT>
+    matrix(const matrix<OtherT, M, N>& m)
         : data_(new container_type)
         { std::copy(m.begin(), m.end(), begin()); }
     matrix(matrix&& m) : data_(std::move(m.data_)) { }
@@ -546,6 +552,15 @@ public:
         }
         return true;
     }
+
+    template<typename Mat>
+    Mat cutdown() const {
+        Mat new_mat;
+        for(size_t m = 0; m < mpl_min__(Mat::rows, rows); m++)
+            for(size_t n = 0; n < mpl_min__(Mat::cols, cols); n++)
+                new_mat.at(m, n) = at(m, n);
+        return new_mat;
+    }
 };
 
 #undef CSELF
@@ -677,6 +692,38 @@ inverse(const matrix<T, M, M>& m_) {
     return transpose(adjugate) / det_val;
 }
 
+template<typename T, size_t M, size_t N, size_t P, size_t Q>
+typename std::enable_if<
+    detail::mpl_min__(M, N) == 1 && detail::mpl_min__(P, Q) &&
+    detail::mpl_max__(M, N) == detail::mpl_max__(P, Q), T>::type
+dot(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
+    T sum(0);
+    for(auto i1 = v1.begin(), i2 = v2.begin(); i1 != v1.end(); ++i1, ++i2)
+        sum += (*i1) * (*i2);
+    return sum;
+}
+
+template<typename T, size_t M, size_t N, size_t P, size_t Q>
+typename std::enable_if<
+    detail::mpl_min__(M, N) == 1 && detail::mpl_min__(P, Q) &&
+    detail::mpl_max__(M, N) == 3 && detail::mpl_max__(P, Q) == 3, col3>::type
+cross(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
+    col3 res;
+    res[0] = det(mat2{
+            v1[1], v1[2],
+            v2[1], v2[2],
+        });
+    res[1] = -det(mat2{
+            v1[0], v1[2],
+            v2[0], v2[2],
+        });
+    res[2] = det(mat2{
+            v1[0], v1[1],
+            v2[0], v2[1],
+        });
+    return res;
+}
+
 template<typename T, size_t M, size_t N>
 std::ostream& operator<<(std::ostream& s, const matrix<T, M, N>& mat) {
     for(size_t m = 0; m < M; m++) {
@@ -793,10 +840,10 @@ inline mat4 orthographic(
     };
 }
 
-}
+} // tf
 
-}
+} // math
 
-}
+} // shrtool
 
 #endif // MATRIX_H_INCLUDED

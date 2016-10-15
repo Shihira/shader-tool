@@ -69,6 +69,8 @@ class image {
     size_t height_ = 0;
 
     mutable color* data_ = nullptr;
+    // mark that if data_ should be deleted on destruction
+    bool data_internal_ = false;
 
     color* lazy_data_() const;
 
@@ -77,8 +79,8 @@ public:
     typedef color const* const_iterator;
 
     // create an new image
-    image() { }
-    image(size_t w, size_t h) : width_(w), height_(h) { }
+    image(size_t w = 0, size_t h = 0, color* data_ = nullptr) :
+        width_(w), height_(h), data_(data_), data_internal_(data_) { }
     image(const image& rhs) : width_(rhs.width_), height_(rhs.height_) {
         std::copy(rhs.begin(), rhs.end(), begin());
     }
@@ -123,7 +125,7 @@ public:
     color const* data() const { return lazy_data_(); }
 
     ~image() {
-        if(data_) delete[] data_;
+        if(data_ && data_internal_) delete[] data_;
     }
 };
 

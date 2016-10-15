@@ -19,6 +19,11 @@ public:
     static inline void key_callback(GLFWwindow* window,
             int key, int scancode, int action, int mods);
 
+    static void fbsize_callback(GLFWwindow* window,
+            int width, int height) {
+        render_target::screen.set_viewport(0, 0, width, height);
+    }
+
     static void init(const std::string ver_str = "330 core",
             std::string title = "Test", size_t w = 800, size_t h = 600) {
         unsigned state = glfwInit();
@@ -46,6 +51,7 @@ public:
                     (const char* const)glewGetErrorString(state));
 
         glfwSetKeyCallback(inst().window, key_callback);
+        glfwSetFramebufferSizeCallback(inst().window, fbsize_callback);
     }
 
     static void geometry_source(size_t& w, size_t& h) {
@@ -82,7 +88,7 @@ public:
     void main_loop() {
         state = RUNNING;
         while(state != FINISHED &&
-                glfwWindowShouldClose(gui_test_context::inst().window)) {
+                !glfwWindowShouldClose(gui_test_context::inst().window)) {
             do_update();
             do_draw();
             glfwSwapBuffers(gui_test_context::inst().window);

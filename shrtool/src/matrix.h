@@ -584,6 +584,14 @@ typedef matrix<double, 4, 5> mat45;
 typedef matrix<double, 3, 4> mat34;
 typedef matrix<double, 2, 3> mat23;
 
+typedef matrix<float, 4, 4> fmat4;
+typedef matrix<float, 3, 3> fmat3;
+typedef matrix<float, 2, 2> fmat2;
+typedef matrix<float, 1, 1> fmat1;
+typedef matrix<float, 4, 5> fmat45;
+typedef matrix<float, 3, 4> fmat34;
+typedef matrix<float, 2, 3> fmat23;
+
 template<typename T, size_t M>
 using col = matrix<T, M, 1>;
 template<typename T, size_t N>
@@ -598,6 +606,16 @@ typedef row<double, 4> row4;
 typedef row<double, 3> row3;
 typedef row<double, 2> row2;
 typedef row<double, 1> row1;
+
+typedef col<float, 4> fcol4;
+typedef col<float, 3> fcol3;
+typedef col<float, 2> fcol2;
+typedef col<float, 1> fcol1;
+
+typedef row<float, 4> frow4;
+typedef row<float, 3> frow3;
+typedef row<float, 2> frow2;
+typedef row<float, 1> frow1;
 
 template<typename T, size_t M, size_t N>
 typename std::enable_if<M == 1 || N == 1, double>::type
@@ -706,7 +724,8 @@ dot(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
 template<typename T, size_t M, size_t N, size_t P, size_t Q>
 typename std::enable_if<
     detail::mpl_min__(M, N) == 1 && detail::mpl_min__(P, Q) &&
-    detail::mpl_max__(M, N) == 3 && detail::mpl_max__(P, Q) == 3, col3>::type
+    detail::mpl_max__(M, N) == 3 && detail::mpl_max__(P, Q) == 3,
+    col<T, 3>>::type
 cross(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
     col3 res;
     res[0] = det(mat2{
@@ -768,7 +787,8 @@ inline matrix<T, 4, 4> diagonal(col<T, 4> diag)
     };
 }
 
-inline mat4 rotate(double a, plane p)
+template<typename T = double>
+inline matrix<T, 4, 4> rotate(double a, plane p)
 {
     if(p == xOy)
         return mat4 {
@@ -812,7 +832,8 @@ template<typename T = double>
 inline matrix<T, 4, 4> identity()
     { return diagonal({1, 1, 1, 1}); }
 
-inline mat4 perspective(double fov, double wh, double zn, double zf)
+template<typename T = double>
+inline matrix<T, 4, 4> perspective(double fov, double wh, double zn, double zf)
 {
     double f = 1 / tan(fov);
     double c = zn - zf;
@@ -824,7 +845,8 @@ inline mat4 perspective(double fov, double wh, double zn, double zf)
     };
 }
 
-inline mat4 orthographic(
+template<typename T = double>
+inline matrix<T, 4, 4> orthographic(
         double l, double r,
         double t, double b,
         double n, double f)

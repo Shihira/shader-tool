@@ -19,23 +19,23 @@ namespace shrtool {
 typedef uint32_t id_type;
 
 template<typename Derived>
-class __lazy_id_object {
+class lazy_id_object_ {
 public:
     id_type id() const {
         if(!_id) _id = reinterpret_cast<const Derived*>(this)->create_object();
         return _id;
     }
 
-    ~__lazy_id_object() {
+    ~lazy_id_object_() {
         if(_id) reinterpret_cast<const Derived*>(this)->destroy_object(_id);
     };
 
-    __lazy_id_object() { }
-    __lazy_id_object(const __lazy_id_object& l) = delete;
-    __lazy_id_object(__lazy_id_object&& l) { std::swap(_id, l._id); }
+    lazy_id_object_() { }
+    lazy_id_object_(const lazy_id_object_& l) = delete;
+    lazy_id_object_(lazy_id_object_&& l) { std::swap(_id, l._id); }
 
-    __lazy_id_object& operator=(const __lazy_id_object& rhs) = delete;
-    __lazy_id_object& operator=(__lazy_id_object&& rhs) {
+    lazy_id_object_& operator=(const lazy_id_object_& rhs) = delete;
+    lazy_id_object_& operator=(lazy_id_object_&& rhs) {
         std::swap(_id, rhs._id);
         return *this;
     }
@@ -52,7 +52,7 @@ private:
 
 namespace render_assets {
 
-class texture : public __lazy_id_object<texture> {
+class texture : public lazy_id_object_<texture> {
 public:
     enum filter_type {
         LINEAR,
@@ -78,27 +78,36 @@ public:
     void level(unsigned l) { _level = l; }
     format internal_format() const { return _format; }
     void internal_format(format f) { _format = f; }
+    filter_type filter() const { return _filter; }
+    void filter(filter_type f) { _filter = f; }
+
+    virtual void bind_to(size_t tex_bind) const = 0;
 };
 
 class texture2d : public texture {
-    size_t __w;
-    size_t __h;
+    size_t w_;
+    size_t h_;
 
 public:
-    texture2d(size_t width, size_t height, format ifmt) :
-        __w(width), __h(height) {
+    texture2d(size_t width, size_t height, format ifmt = DEFAULT_FMT) :
+        w_(width), h_(height) {
         internal_format(ifmt);
     }
     void fill(void* data, format fmt);
 
-    size_t width() const { return __w; }
-    void width(size_t w) { __w = w; }
-    size_t height() const { return __h; }
-    void height(size_t h) { __h = h; }
+    size_t width() const { return w_; }
+    void width(size_t w) { w_ = w; }
+    size_t height() const { return h_; }
+    void height(size_t h) { h_ = h; }
+
+    // there is a texture limitation for each render pass in graphical dirvers
+    // this is for binding textures to a number for the current render pass
+    // usually called by shader::draw
+    virtual void bind_to(size_t tex_bind) const;
 };
 
 class texture_cubemap2d : public texture {
-    size_t __edge_len;
+    size_t edge_len_;
 
 public:
     enum face_index {
@@ -107,47 +116,75 @@ public:
         LEFT, RIGHT,
     };
 
-    texture_cubemap2d(size_t edge_len, format ifmt) :
-        __edge_len(edge_len) {
+    texture_cubemap2d(size_t edge_len, format ifmt = DEFAULT_FMT) :
+        edge_len_(edge_len) {
         internal_format(ifmt);
     }
 
     void fill(face_index f, void* data, format fmt);
-    size_t edge_length() const { return __edge_len; }
+    size_t edge_length() const { return edge_len_; }
+
+    virtual void bind_to(size_t tex_bind) const;
 };
 
-class buffer : public __lazy_id_object<buffer> {
+class buffer : public lazy_id_object_<buffer> {
 protected:
-    size_t _size = 0;
+    size_t size_ = 0;
 
 public:
+    /*
+     * You can choose to specify the size on construction or not. If not, you
+     * must specify a size during write or map. They are mutual exclusive:
+     * you cannot specify the size a second time, except that sizes are equal.
+     *
+     * Each time you calling a write/start_map without leaving sz == 0 means
+     * you want to reset the size, when please keep the size equal.
+     */
+    buffer(size_t sz = 0) : size_(sz) { }
     enum buffer_transfer_mode { STATIC = 0, DYNAMIC = 1 };
-    enum buffer_access { WRITE = 0, READ = 2 };
+    enum buffer_access { NO_ACCESS = 0, WRITE = 4, READ = 2 , RW = 6};
 
-    virtual void write(void* data, size_t size) = 0;
+    virtual void write(void* data, size_t sz = 0) = 0;
+    virtual void* start_map(buffer_access bt, size_t sz = 0) = 0;
+    virtual void stop_map() = 0;
 
-    buffer_transfer_mode transfer_mode() const { return __trans_mode; }
-    void transfer_mode(buffer_transfer_mode bt) { __trans_mode = bt; }
-    buffer_access access() const { return __access; }
-    void access(buffer_access ba) { __access = ba; }
-    size_t size() const { return _size; }
+    template<typename T>
+    T* start_map(buffer_access bt, size_t sz = 0) {
+        return static_cast<T*>(start_map(bt, sz * sizeof(T)));
+    }
+
+    buffer_transfer_mode transfer_mode() const { return trans_mode_; }
+    void transfer_mode(buffer_transfer_mode bt) { trans_mode_ = bt; }
+    buffer_access access() const { return access_; }
+    void access(buffer_access ba) { access_ = ba; }
+    size_t size() const { return size_; }
+    void size(size_t sz);
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
 
+protected:
+    buffer_access mapping_state_ = NO_ACCESS;
+
 private:
-    buffer_transfer_mode __trans_mode = STATIC;
-    buffer_access __access = WRITE;
+    buffer_transfer_mode trans_mode_ = STATIC;
+    buffer_access access_ = WRITE;
 };
 
 class vertex_attr_buffer : public buffer {
 public:
-    void write(void* data, size_t size);
+    void write(void* data, size_t sz = 0) override;
+    using buffer::start_map;
+    void* start_map(buffer_access bt, size_t sz = 0) override;
+    void stop_map() override;
 };
 
 class property_buffer : public buffer {
 public:
-    void write(void* data, size_t size);
+    void write(void* data, size_t sz = 0) override;
+    using buffer::start_map;
+    void* start_map(buffer_access bt, size_t sz = 0) override;
+    void stop_map() override;
 };
 
 }
@@ -155,12 +192,12 @@ public:
 #define DEF_ENUM_MAP(fn, from_type, to_type, map_content) \
     static to_type fn(from_type e) { \
         static const std::unordered_map<from_type, to_type> \
-            __trans_map map_content; \
-        auto __i = __trans_map.find(e); \
-        if(__i == __trans_map.end()) \
+            trans_map_ map_content; \
+        auto i_ = trans_map_.find(e); \
+        if(i_ == trans_map_.end()) \
             throw shrtool::enum_map_error( \
                     std::string("Failed when mapping ") + #fn); \
-        return __i->second; \
+        return i_->second; \
     }
 
 }

@@ -10,18 +10,18 @@
 
 namespace shrtool {
 
-class render_target : public __lazy_id_object<render_target> {
+class render_target : public lazy_id_object_<render_target> {
 protected:
-    bool _screen = false;
-    float _init_color[4] = { 0, 0, 0, 1 };
-    size_t _viewport[4] = { 0, 0, 0, 0 };
-    float _init_depth = 1;
-    bool _enabled_depth_test = false;
+    bool screen_ = false;
+    float init_color_[4] = { 0, 0, 0, 1 };
+    size_t viewport_[4] = { 0, 0, 0, 0 };
+    float init_depth_ = 1;
+    bool enabled_depth_test_ = false;
 
-    render_target(bool scr) : _screen(scr) { }
+    render_target(bool scr) : screen_(scr) { }
 
 public:
-    render_target() : _screen(false) { }
+    render_target() : screen_(false) { }
 
     enum buffer_attachment {
         COLOR_BUFFER,
@@ -34,21 +34,21 @@ public:
     void render_texture(buffer_attachment ba, render_assets::texture2d& tex);
     void set_viewport(size_t x, size_t y, size_t w, size_t h);
     void clear_buffer(buffer_attachment ba);
-    void initial_depth(float d) { _init_depth = d; }
+    void initial_depth(float d) { init_depth_ = d; }
     void initial_color(float r, float g, float b, float a) {
-        _init_color[0] = r; _init_color[1] = g;
-        _init_color[2] = b; _init_color[3] = a;
+        init_color_[0] = r; init_color_[1] = g;
+        init_color_[2] = b; init_color_[3] = a;
     }
-    void enable_depth_test(bool e) { _enabled_depth_test = e; }
-    bool is_depth_test_enabled() const { return _enabled_depth_test; }
+    void enable_depth_test(bool e) { enabled_depth_test_ = e; }
+    bool is_depth_test_enabled() const { return enabled_depth_test_; }
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
 
-    bool isscr() const { return _screen; }
+    bool isscr() const { return screen_; }
 
     float target_ratio() const {
-        return float(_viewport[2]) / float(_viewport[3]);
+        return float(viewport_[2]) / float(viewport_[3]);
     }
 
     static render_target screen;
@@ -57,7 +57,7 @@ public:
 class sub_shader;
 class vertex_attr_vector;
 
-class shader : public __lazy_id_object<shader> {
+class shader : public lazy_id_object_<shader> {
 public:
     enum shader_type {
         VERTEX,
@@ -75,7 +75,11 @@ public:
             const render_assets::property_buffer& buf);
     void property(size_t binding,
             const render_assets::property_buffer& buf);
-    void target(render_target& tgt) { _target = &tgt; }
+    size_t property(const std::string& name,
+            const render_assets::texture& tex);
+    void property(size_t binding,
+            const render_assets::texture& tex);
+    void target(render_target& tgt) { target_ = &tgt; }
     void draw(const vertex_attr_vector& vat) const;
 
     void link();
@@ -84,17 +88,18 @@ public:
     void destroy_object(id_type i) const;
 
 protected:
-    std::list<sub_shader> _subshader_list;
-    std::unordered_map<std::string, size_t> _property_binding;
-    size_t _max_binding_index = 0;
+    std::list<sub_shader> subshader_list_;
+    std::unordered_map<std::string, size_t> property_binding_;
+    std::unordered_map<size_t, const render_assets::texture*> textures_binding_;
+    size_t max_binding_index_ = 0;
 
-    render_target* _target;
+    render_target* target_;
 };
 
-class sub_shader : public __lazy_id_object<sub_shader> {
-    shader::shader_type __type;
+class sub_shader : public lazy_id_object_<sub_shader> {
+    shader::shader_type type_;
 public:
-    sub_shader(shader::shader_type t) : __type(t) { }
+    sub_shader(shader::shader_type t) : type_(t) { }
 
     void compile(const std::string& s);
 
@@ -102,15 +107,15 @@ public:
     void destroy_object(id_type i) const;
 };
 
-class vertex_attr_vector : public __lazy_id_object<vertex_attr_vector> {
+class vertex_attr_vector : public lazy_id_object_<vertex_attr_vector> {
 protected:
-    mutable size_t _primitives_count;
+    mutable size_t primitives_count_;
 
 public:
     void input(uint32_t loc,const render_assets::buffer& buf) const;
 
-    size_t primitives_count() const { return _primitives_count; }
-    void primitives_count(const size_t& p) const { _primitives_count = p; }
+    size_t primitives_count() const { return primitives_count_; }
+    void primitives_count(const size_t& p) const { primitives_count_ = p; }
 
     id_type create_object() const;
     void destroy_object(id_type i) const;

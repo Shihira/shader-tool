@@ -8,8 +8,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "singleton.h"
-
 /*
  * NOTE: A render asset must not contain the reference of another.
  */
@@ -22,21 +20,21 @@ template<typename Derived>
 class lazy_id_object_ {
 public:
     id_type id() const {
-        if(!_id) _id = reinterpret_cast<const Derived*>(this)->create_object();
-        return _id;
+        if(!id_) id_ = reinterpret_cast<const Derived*>(this)->create_object();
+        return id_;
     }
 
     ~lazy_id_object_() {
-        if(_id) reinterpret_cast<const Derived*>(this)->destroy_object(_id);
+        if(id_) reinterpret_cast<const Derived*>(this)->destroy_object(id_);
     };
 
     lazy_id_object_() { }
     lazy_id_object_(const lazy_id_object_& l) = delete;
-    lazy_id_object_(lazy_id_object_&& l) { std::swap(_id, l._id); }
+    lazy_id_object_(lazy_id_object_&& l) { std::swap(id_, l.id_); }
 
     lazy_id_object_& operator=(const lazy_id_object_& rhs) = delete;
     lazy_id_object_& operator=(lazy_id_object_&& rhs) {
-        std::swap(_id, rhs._id);
+        std::swap(id_, rhs.id_);
         return *this;
     }
 
@@ -44,7 +42,7 @@ public:
     typedef std::weak_ptr<Derived> wptr;
 
 private:
-    mutable id_type _id = 0;
+    mutable id_type id_ = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -69,15 +67,15 @@ public:
     void destroy_object(id_type i) const;
 
 protected:
-    unsigned _level = 0;
-    filter_type _filter;
-    format _format = DEFAULT_FMT;
+    unsigned level_ = 0;
+    filter_type _filter = NEAREST;
+    format format_ = DEFAULT_FMT;
 
 public:
-    unsigned level() const { return _level; }
-    void level(unsigned l) { _level = l; }
-    format internal_format() const { return _format; }
-    void internal_format(format f) { _format = f; }
+    unsigned level() const { return level_; }
+    void level(unsigned l) { level_ = l; }
+    format internal_format() const { return format_; }
+    void internal_format(format f) { format_ = f; }
     filter_type filter() const { return _filter; }
     void filter(filter_type f) { _filter = f; }
 
@@ -127,9 +125,48 @@ public:
     virtual void bind_to(size_t tex_bind) const;
 };
 
+namespace element_type {
+    enum element_type_e {
+        UNKNOWN = 0, FLOAT, BYTE, UINT
+    };
+
+    template<typename T>
+    struct element_type_helper {
+        static constexpr element_type_e type = UNKNOWN;
+    };
+
+    template<>
+    struct element_type_helper<float> {
+        static constexpr element_type_e type = FLOAT;
+    };
+
+    template<>
+    struct element_type_helper<uint8_t> {
+        static constexpr element_type_e type = BYTE;
+    };
+
+    template<>
+    struct element_type_helper<uint32_t> {
+        static constexpr element_type_e type = UINT;
+    };
+}
+
 class buffer : public lazy_id_object_<buffer> {
+public:
+    enum buffer_transfer_mode {
+        STATIC = 0, DYNAMIC = 1
+    };
+
+    enum buffer_access {
+        NO_ACCESS = 0, WRITE = 4, READ = 2 , RW = WRITE | READ
+    };
+
 protected:
     size_t size_ = 0;
+    buffer_access mapping_state_ = NO_ACCESS;
+    buffer_transfer_mode trans_mode_ = STATIC;
+    buffer_access access_ = WRITE;
+    element_type::element_type_e etype_ = element_type::UNKNOWN;
 
 public:
     /*
@@ -141,15 +178,27 @@ public:
      * you want to reset the size, when please keep the size equal.
      */
     buffer(size_t sz = 0) : size_(sz) { }
-    enum buffer_transfer_mode { STATIC = 0, DYNAMIC = 1 };
-    enum buffer_access { NO_ACCESS = 0, WRITE = 4, READ = 2 , RW = 6};
 
-    virtual void write(void* data, size_t sz = 0) = 0;
+    virtual void write_raw(const void* data, size_t sz = 0) = 0;
+    virtual void read_raw(void* data, size_t sz = 0) = 0;
+
     virtual void* start_map(buffer_access bt, size_t sz = 0) = 0;
     virtual void stop_map() = 0;
 
     template<typename T>
+    void write(const T* data, size_t sz = 0) {
+        etype_ = element_type::element_type_helper<T>::type;
+        write_raw(data, sz * sizeof(T));
+    }
+
+    template<typename T>
+    void read(T* data, size_t sz = 0) {
+        read_raw(data, sz * sizeof(T));
+    }
+
+    template<typename T>
     T* start_map(buffer_access bt, size_t sz = 0) {
+        etype_ = element_type::element_type_helper<T>::type;
         return static_cast<T*>(start_map(bt, sz * sizeof(T)));
     }
 
@@ -159,29 +208,32 @@ public:
     void access(buffer_access ba) { access_ = ba; }
     size_t size() const { return size_; }
     void size(size_t sz);
+    void type(element_type::element_type_e t) { etype_ = t; }
+    element_type::element_type_e type() const { return etype_; }
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
-
-protected:
-    buffer_access mapping_state_ = NO_ACCESS;
-
-private:
-    buffer_transfer_mode trans_mode_ = STATIC;
-    buffer_access access_ = WRITE;
 };
 
 class vertex_attr_buffer : public buffer {
+    bool first_map = true;
+
 public:
-    void write(void* data, size_t sz = 0) override;
+    void write_raw(const void* data, size_t sz = 0) override;
+    void read_raw(void* data, size_t sz = 0) override;
+    using buffer::buffer;
     using buffer::start_map;
     void* start_map(buffer_access bt, size_t sz = 0) override;
     void stop_map() override;
 };
 
 class property_buffer : public buffer {
+    bool first_map = true;
+
 public:
-    void write(void* data, size_t sz = 0) override;
+    void write_raw(const void* data, size_t sz = 0) override;
+    void read_raw(void* data, size_t sz = 0) override;
+    using buffer::buffer;
     using buffer::start_map;
     void* start_map(buffer_access bt, size_t sz = 0) override;
     void stop_map() override;

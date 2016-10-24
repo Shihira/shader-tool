@@ -1,3 +1,4 @@
+#define EXPOSE_EXCEPTION
 #include "gui_test.h"
 #include "matrix.h"
 
@@ -7,6 +8,11 @@ using namespace shrtool::render_assets;
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+size_t ctsize(const T& ct) {
+    return std::distance(std::begin(ct), std::end(ct));
+}
 
 TEST_CASE_FIXTURE(test_rectangle, singlefunc_fixture) {
     render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
@@ -54,17 +60,15 @@ TEST_CASE_FIXTURE(test_rectangle, singlefunc_fixture) {
 
 
     property_buffer prop_color;
-    vertex_attr_buffer attr_position;
     vertex_attr_vector attr_vec;
     bool incDirection;
-
-    // Write buffers
-    attr_position.write(attr_position_data, sizeof(attr_position_data));
 
     // Set buffers
     shr.property("material", prop_color);
     attr_vec.primitives_count(6);
-    attr_vec.input(0, attr_position);
+    vertex_attr_buffer& attr_position = attr_vec.add_input(0);
+    attr_position.write(attr_position_data, ctsize(attr_position_data));
+    attr_vec.updated();
 
     incDirection = true;
 
@@ -73,7 +77,7 @@ TEST_CASE_FIXTURE(test_rectangle, singlefunc_fixture) {
         if(prop_color_data[1] <= 0 && !incDirection) incDirection = true;
 
         prop_color_data[1] += incDirection ? 0.01 : -0.01;
-        prop_color.write(prop_color_data, sizeof(prop_color_data));
+        prop_color.write(prop_color_data, ctsize(prop_color_data));
     };
 
     draw = [&]() {
@@ -232,9 +236,6 @@ TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
 
     vertex_attr_vector attr_vec;
 
-    vertex_attr_buffer attr_position;
-    vertex_attr_buffer attr_normal;
-    vertex_attr_buffer attr_uv;
     property_buffer prop_mvp;
     property_buffer prop_material;
     property_buffer prop_illum;
@@ -262,6 +263,12 @@ TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
     mat4 proj_mat = tf::perspective(M_PI / 4, 4.0 / 3, 1, 100);
 
     // fill attributes
+    attr_vec.primitives_count(cube_num_vertices);
+    vertex_attr_buffer
+        & attr_position = attr_vec.add_input(0),
+        & attr_normal = attr_vec.add_input(1),
+        & attr_uv = attr_vec.add_input(2);
+
     float* attr_position_data = attr_position.start_map<float>(
             buffer::WRITE, 4 * cube_num_vertices);
     float* attr_normal_data = attr_normal.start_map<float>(
@@ -284,15 +291,12 @@ TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
     attr_position.stop_map();
     attr_normal.stop_map();
     attr_uv.stop_map();
+    attr_vec.updated();
 
-    prop_material.write(prop_material_data, sizeof(prop_material_data));
-    prop_illum.write(prop_illum_data, sizeof(prop_illum_data));
+    prop_material.write(prop_material_data, ctsize(prop_material_data));
+    prop_illum.write(prop_illum_data, ctsize(prop_illum_data));
     prop_mvp.transfer_mode(buffer::DYNAMIC);
 
-    attr_vec.primitives_count(cube_num_vertices);
-    attr_vec.input(0, attr_position);
-    attr_vec.input(1, attr_normal);
-    attr_vec.input(2, attr_uv);
 
     shr.property("mvp", prop_mvp);
     shr.property("illum", prop_illum);
@@ -402,9 +406,6 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
 
     vertex_attr_vector attr_vec;
 
-    vertex_attr_buffer attr_position;
-    vertex_attr_buffer attr_normal;
-    vertex_attr_buffer attr_uv;
     property_buffer prop_mvp;
     property_buffer prop_material;
     property_buffer prop_illum;
@@ -434,6 +435,12 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
     mat4 proj_mat = tf::perspective(M_PI / 4, 4.0 / 3, 1, 100);
 
     // fill attributes
+    vertex_attr_buffer
+        & attr_position = attr_vec.add_input(0),
+        & attr_normal = attr_vec.add_input(1),
+        & attr_uv = attr_vec.add_input(2);
+
+    attr_vec.primitives_count(cube_num_vertices);
     float* attr_position_data = attr_position.start_map<float>(
             buffer::WRITE, 4 * cube_num_vertices);
     float* attr_normal_data = attr_normal.start_map<float>(
@@ -456,6 +463,7 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
     attr_position.stop_map();
     attr_normal.stop_map();
     attr_uv.stop_map();
+    attr_vec.updated();
 
     for(size_t i = 0; i < 512; i++)
         for(size_t j = 0; j < 512; j++) {
@@ -470,11 +478,6 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
     prop_material.write(prop_material_data, sizeof(prop_material_data));
     prop_illum.write(prop_illum_data, sizeof(prop_illum_data));
     prop_mvp.transfer_mode(buffer::DYNAMIC);
-
-    attr_vec.primitives_count(cube_num_vertices);
-    attr_vec.input(0, attr_position);
-    attr_vec.input(1, attr_normal);
-    attr_vec.input(2, attr_uv);
 
     shr.property("mvp", prop_mvp);
     shr.property("illum", prop_illum);

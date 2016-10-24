@@ -7,6 +7,8 @@
 
 namespace shrtool {
 
+using namespace render_assets;
+
 DEF_ENUM_MAP(em_shader_type_, shader::shader_type, GLenum, ({
         { shader::VERTEX,   GL_VERTEX_SHADER },
         { shader::GEOMETRY, GL_GEOMETRY_SHADER },
@@ -28,6 +30,18 @@ DEF_ENUM_MAP(em_buffer_attachment_, render_target::buffer_attachment, GLenum, ({
 DEF_ENUM_MAP(em_clear_mask_, render_target::buffer_attachment, GLbitfield, ({
         { render_target::COLOR_BUFFER, GL_COLOR_BUFFER_BIT },
         { render_target::DEPTH_BUFFER, GL_DEPTH_BUFFER_BIT },
+    }))
+
+DEF_ENUM_MAP(em_element_type_, element_type::element_type_e, GLenum, ({
+        { element_type::FLOAT, GL_FLOAT },
+        { element_type::BYTE, GL_UNSIGNED_BYTE },
+        { element_type::UINT, GL_UNSIGNED_INT },
+    }))
+
+DEF_ENUM_MAP(em_element_type_size_, element_type::element_type_e, size_t, ({
+        { element_type::FLOAT, sizeof(float) },
+        { element_type::BYTE, sizeof(uint8_t) },
+        { element_type::UINT, sizeof(uint32_t) },
     }))
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,10 +127,13 @@ void render_target::clear_buffer(render_target::buffer_attachment ba) {
 }
 
 sub_shader& shader::add_sub_shader(shader::shader_type t) {
-    subshader_list_.emplace_back(t);
-    sub_shader& s = subshader_list_.back();
-    glAttachShader(id(), s.id());
-    return s;
+    sub_shader_ptr p(new sub_shader(t));
+    add_sub_shader(p);
+    return *p;
+}
+
+void shader::add_sub_shader(shader::sub_shader_ptr p) {
+    sub_shaders_[p->type()] = p;
 }
 
 void shader::property_binding(const std::string& name, size_t binding) {
@@ -187,6 +204,10 @@ void shader::draw(const vertex_attr_vector& vat) const {
 }
 
 void shader::link() {
+    for(auto& e : sub_shaders_) {
+        glAttachShader(id(), e.second->id());
+    }
+
     glLinkProgram(id());
 
     GLint status;
@@ -221,16 +242,23 @@ void sub_shader::compile(const std::string& s) {
     }
 }
 
-void vertex_attr_vector::input(uint32_t loc,const render_assets::buffer& buf) const {
+void vertex_attr_vector::updated() {
+    for(auto& e : bindings_)
+        updated(e.first);
+}
+
+void vertex_attr_vector::updated(size_t loc) {
+    auto& buf = bindings_[loc];
+
     if(!primitives_count())
         throw shader_error("No primitives count speicfied");
 
     glBindVertexArray(id());
-    glBindBuffer(GL_ARRAY_BUFFER, buf.id());
+    glBindBuffer(GL_ARRAY_BUFFER, buf->id());
     glEnableVertexAttribArray(loc);
-    glVertexAttribPointer(loc,
-            buf.size() / primitives_count() / sizeof(GLfloat),
-            GL_FLOAT, GL_TRUE, 0, 0);
+    glVertexAttribPointer(loc, buf->size() /
+                primitives_count() / em_element_type_size_(buf->type()),
+            em_element_type_(buf->type()), GL_TRUE, 0, 0);
     glBindVertexArray(GL_NONE);
 }
 

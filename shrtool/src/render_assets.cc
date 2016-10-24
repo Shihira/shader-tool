@@ -4,8 +4,6 @@
 #include "render_assets.h"
 #include "exception.h"
 
-using namespace std;
-
 namespace shrtool {
 
 namespace render_assets {
@@ -116,34 +114,50 @@ void buffer::size(size_t sz) {
     size_ = sz;
 }
 
-void vertex_attr_buffer::write(void* data, size_t sz) {
-    size(sz);
+void vertex_attr_buffer::write_raw(const void* data, size_t sz) {
+    if(sz) size(sz);
     if(!size())
         throw restriction_error("Buffer has zero size");
 
     glBindBuffer(GL_ARRAY_BUFFER, id());
     glBufferData(GL_ARRAY_BUFFER, size(), data,
             em_buffer_usage_(transfer_mode() | access()));
-    size_ = sz;
     glBindBuffer(GL_ARRAY_BUFFER, GL_NONE);
 }
 
-void property_buffer::write(void* data, size_t sz) {
-    size(sz);
+void property_buffer::write_raw(const void* data, size_t sz) {
+    if(sz) size(sz);
     if(!size())
         throw restriction_error("Buffer has zero size");
 
     glBindBuffer(GL_UNIFORM_BUFFER, id());
     glBufferData(GL_UNIFORM_BUFFER, size(), data,
             em_buffer_usage_(transfer_mode() | access()));
-    size_ = sz;
     glBindBuffer(GL_UNIFORM_BUFFER, GL_NONE);
 }
 
-void* vertex_attr_buffer::start_map(buffer_access bt, size_t sz) {
-    bool first_map = size() == 0;
+void property_buffer::read_raw(void* data, size_t sz) {
+    if(sz > size())
+        throw restriction_error("Size to read too large");
+    if(!sz) sz = size();
 
-    size(sz);
+    glBindBuffer(GL_UNIFORM_BUFFER, id());
+    glGetBufferSubData(GL_UNIFORM_BUFFER, 0, sz, data);
+    glBindBuffer(GL_UNIFORM_BUFFER, GL_NONE);
+}
+
+void vertex_attr_buffer::read_raw(void* data, size_t sz) {
+    if(sz > size())
+        throw restriction_error("Size to read too large");
+    if(!sz) sz = size();
+
+    glBindBuffer(GL_ARRAY_BUFFER, id());
+    glGetBufferSubData(GL_ARRAY_BUFFER, 0, sz, data);
+    glBindBuffer(GL_ARRAY_BUFFER, GL_NONE);
+}
+
+void* vertex_attr_buffer::start_map(buffer_access bt, size_t sz) {
+    if(sz) size(sz);
     if(!size())
         throw restriction_error("Buffer has zero size");
 
@@ -151,6 +165,7 @@ void* vertex_attr_buffer::start_map(buffer_access bt, size_t sz) {
     if(first_map) {
         glBufferData(GL_ARRAY_BUFFER, size(), NULL,
             em_buffer_usage_(transfer_mode() | access()));
+        first_map = false;
     }
     void* ptr = glMapBuffer(GL_ARRAY_BUFFER, em_buffer_access_(bt));
     mapping_state_ = bt;
@@ -170,9 +185,7 @@ void vertex_attr_buffer::stop_map() {
 
 
 void* property_buffer::start_map(buffer_access bt, size_t sz) {
-    bool first_map = size() == 0;
-
-    size(sz);
+    if(sz) size(sz);
     if(!size())
         throw restriction_error("Buffer has zero size");
 
@@ -180,6 +193,7 @@ void* property_buffer::start_map(buffer_access bt, size_t sz) {
     if(first_map) {
         glBufferData(GL_UNIFORM_BUFFER, size(), NULL,
             em_buffer_usage_(transfer_mode() | access()));
+        first_map = false;
     }
     void* ptr = glMapBuffer(GL_UNIFORM_BUFFER, em_buffer_access_(bt));
     mapping_state_ = bt;

@@ -3,12 +3,29 @@
 
 #include <string>
 #include <list>
+#include <memory>
 #include <unordered_map>
 
 #include "render_assets.h"
 #include "exception.h"
 
 namespace shrtool {
+
+/*
+ * shader's behaviour resembles vertex_attr_vector's, they look very different
+ * though. I will explain why.
+ *
+ * 1. Both are consist of some children:
+ *     shader - sub_shader
+ *     vertex_attr_vector - vertex_attr_buffer.
+ * 2. Children of both can be shared, and are in charge of their parents.
+ *    Whenever their all parents have gone, they should gone too:
+ *     share_sub_shader
+ *     share_input
+ * 3. After adding children, you have to notice parents to update:
+ *     add_sub_shader - link
+ *     add_input - updated
+ */
 
 class render_target : public lazy_id_object_<render_target> {
 protected:
@@ -65,10 +82,32 @@ public:
         FRAGMENT,
     };
 
+    typedef std::shared_ptr<sub_shader> sub_shader_ptr;
+    typedef std::weak_ptr<sub_shader> weak_sub_shader_ptr;
+
+protected:
+    void property_binding(const std::string& name, size_t binding);
+
+    std::unordered_map<shader_type, sub_shader_ptr> sub_shaders_;
+
+    size_t max_binding_index_ = 0;
+    std::unordered_map<std::string, size_t> property_binding_;
+    std::unordered_map<size_t, const render_assets::texture*> textures_binding_;
+
+    render_target* target_;
+
+public:
     shader() { target(render_target::screen); }
 
+    void add_sub_shader(sub_shader_ptr p);
     sub_shader& add_sub_shader(shader_type t);
-    void property_binding(const std::string& name, size_t binding);
+
+    sub_shader_ptr share_sub_shader(shader_type t) {
+        auto i = sub_shaders_.find(t);
+        if(i != sub_shaders_.end()) return i->second;
+        return sub_shader_ptr();
+    }
+
     // auto bind property with its name
     // and return the allocated binding index
     size_t property(const std::string& name,
@@ -86,14 +125,6 @@ public:
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
-
-protected:
-    std::list<sub_shader> subshader_list_;
-    std::unordered_map<std::string, size_t> property_binding_;
-    std::unordered_map<size_t, const render_assets::texture*> textures_binding_;
-    size_t max_binding_index_ = 0;
-
-    render_target* target_;
 };
 
 class sub_shader : public lazy_id_object_<sub_shader> {
@@ -103,19 +134,48 @@ public:
 
     void compile(const std::string& s);
 
+    shader::shader_type type() const { return type_; }
+    void type(shader::shader_type t) { type_ = t; }
+
     id_type create_object() const;
     void destroy_object(id_type i) const;
 };
 
 class vertex_attr_vector : public lazy_id_object_<vertex_attr_vector> {
+public:
+    typedef std::shared_ptr<render_assets::vertex_attr_buffer> buffer_ptr;
+    typedef std::weak_ptr<render_assets::vertex_attr_buffer> weak_buffer_ptr;
+
 protected:
     mutable size_t primitives_count_;
+    // we use shared_ptr to manage buffers, which enables users to share
+    // buffers between different vertex_attr_vectors
+    std::unordered_map<size_t, buffer_ptr> bindings_;
 
 public:
-    void input(uint32_t loc,const render_assets::buffer& buf) const;
+    // create a new buffer with old one overridden
+    void input(uint32_t loc, buffer_ptr buf) {
+        bindings_[loc] = buf;
+    }
+
+    render_assets::vertex_attr_buffer& add_input(size_t loc, size_t size = 0) {
+        buffer_ptr p(new render_assets::vertex_attr_buffer(size));
+        input(loc, p);
+        return *p;
+    }
+
+    buffer_ptr share_input(size_t loc) {
+        auto i = bindings_.find(loc);
+        if(i != bindings_.end())
+            return i->second;
+        return buffer_ptr();
+    }
+
+    void updated();
+    void updated(size_t loc);
 
     size_t primitives_count() const { return primitives_count_; }
-    void primitives_count(const size_t& p) const { primitives_count_ = p; }
+    void primitives_count(size_t p) const { primitives_count_ = p; }
 
     id_type create_object() const;
     void destroy_object(id_type i) const;

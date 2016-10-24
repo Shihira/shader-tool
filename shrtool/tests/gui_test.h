@@ -36,6 +36,7 @@ public:
                  prof = profile_str == "core" ?
                      GLFW_OPENGL_CORE_PROFILE : GLFW_OPENGL_ANY_PROFILE;
 
+        if(title.empty()) glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, ver_1);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, ver_2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, prof);

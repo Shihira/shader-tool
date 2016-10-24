@@ -60,6 +60,8 @@ struct color {
     const_iterator cend() { return data.bytes + 4; }
 };
 
+static_assert(sizeof(color) == 4, "Bad: sizeof(color) != 4");
+
 std::ostream& operator<<(std::ostream& os, const color& c);
 
 class image {

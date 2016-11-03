@@ -169,5 +169,76 @@ void mesh_io_object::load_into_meshes(
     }
 }
 
+mesh_uv_sphere::mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v)
+{
+    if(tesel_u < 3 || tesel_v < 2) return;
+
+    // generate vertices, normals, and uvs
+    for(size_t v = 0; v <= tesel_v; ++v) {
+        double angle_v = double(v) / tesel_v * math::PI;
+        double y = radius * std::cos(angle_v);
+        // this is the radius of the circle where the current plane (determined
+        // by y) intersects with the sphere.
+        double r_ = radius * std::sin(angle_v);
+
+        for(size_t u = 0; u < tesel_u; ++u) {
+            double angle_u = double(u) / tesel_u * math::PI * 2;
+            double x = r_ * std::cos(angle_u);
+            double z = r_ * std::sin(angle_u);
+
+            stor_positions->push_back(col4{x, y, z, 1});
+            stor_normals->push_back(col3{x/radius, y/radius, z/radius});
+            stor_uvs->push_back(col3{double(u) / tesel_u,
+                    double(v) / tesel_v, 1});
+
+            // take the center point of each grid in textures on polars
+            if(v == 0 || v == tesel_v)
+                stor_uvs->back()[0] = (u + 0.5) / tesel_u;
+        }
+    }
+
+    // generate triangles
+    for(size_t v = 0; v < tesel_v; ++v) {
+        for(size_t u = 0; u < tesel_u; ++u) {
+            size_t i = v * tesel_v + u;
+            size_t i_r = v * tesel_v + (u + 1) % tesel_u;
+            size_t i_b = i + tesel_u;
+            size_t i_rb = i_r + tesel_u;
+
+            if(v != 0) { // not north polar
+                positions.indices.push_back(i_r);
+                positions.indices.push_back(i);
+                positions.indices.push_back(i_b);
+
+                normals.indices.push_back(i_r);
+                normals.indices.push_back(i);
+                normals.indices.push_back(i_b);
+
+                uvs.indices.push_back(i_r);
+                uvs.indices.push_back(i);
+                uvs.indices.push_back(i_b);
+            }
+
+            if(v != tesel_v - 1) { // not south polar
+                positions.indices.push_back(i_b);
+                positions.indices.push_back(i_rb);
+                positions.indices.push_back(i_r);
+
+                normals.indices.push_back(i_b);
+                normals.indices.push_back(i_rb);
+                normals.indices.push_back(i_r);
+
+                uvs.indices.push_back(i_b);
+                uvs.indices.push_back(i_rb);
+                uvs.indices.push_back(i_r);
+            }
+        }
+    }
+}
+
+mesh_plane::mesh_plane(size_t tesel_x, size_t tesel_y)
+{
+}
+
 }
 

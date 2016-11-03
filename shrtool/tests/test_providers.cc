@@ -15,6 +15,8 @@ struct attr_data_1 {
     vector<int> some_data_2;
 };
 
+namespace shrtool {
+
 template<>
 struct attr_trait<attr_data_1> {
     typedef attr_data_1 input_type;
@@ -44,6 +46,8 @@ struct attr_trait<attr_data_1> {
             std::copy(i.some_data_2.begin(), i.some_data_2.end(), data);
     }
 };
+
+}
 
 TEST_CASE(test_attr_indirect_provider) {
     attr_data_1 d;
@@ -75,6 +79,8 @@ struct attr_data_2 {
     vector<uint32_t> some_data;
 };
 
+namespace shrtool {
+
 template<>
 struct attr_trait<attr_data_2> {
     typedef attr_data_2 input_type;
@@ -103,6 +109,8 @@ struct attr_trait<attr_data_2> {
     }
 };
 
+}
+
 TEST_CASE(test_attr_raw_data_provider) {
     attr_data_2 d;
     d.some_data = vector<uint32_t> {
@@ -126,6 +134,8 @@ struct prop_data_1 {
     vector<uint32_t> data;
 };
 
+namespace shrtool {
+
 template<>
 struct prop_trait<prop_data_1> {
     typedef prop_data_1 input_type;
@@ -140,6 +150,8 @@ struct prop_trait<prop_data_1> {
         std::copy(i.data.begin(), i.data.end(), o);
     }
 };
+
+}
 
 
 TEST_CASE(test_prop_indirect_provider) {
@@ -161,6 +173,8 @@ struct prop_data_2 {
     vector<uint32_t> data;
 };
 
+namespace shrtool {
+
 template<>
 struct prop_trait<prop_data_2> {
     typedef prop_data_2 input_type;
@@ -176,6 +190,7 @@ struct prop_trait<prop_data_2> {
     }
 };
 
+}
 
 TEST_CASE(test_prop_raw_data_provider) {
     prop_data_2 d;

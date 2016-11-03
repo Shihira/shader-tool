@@ -4,9 +4,11 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <type_traits>
 
 #include "matrix.h"
 #include "image.h"
+#include "res_trait.h"
 
 namespace shrtool {
 
@@ -57,6 +59,9 @@ public:
         { return self().uvs[tri * 3 + vert]; }
     const math::col4& get_uv(size_t tri, size_t vert) const
         { return self().uvs[tri * 3 + vert]; }
+
+    size_t triangles() const { return vertices() / 3; }
+    size_t vertices() const { return self().positions.size(); }
 };
 
 struct mesh_basic : mesh_base<mesh_basic> {
@@ -87,10 +92,10 @@ struct indexed_attr {
     /*
      * built-in iterator for special purpose
      */
-    template<typename ValType>
+    template<typename ValType, typename Ref = indexed_attr&>
     struct indexed_attr_iterator :
             std::iterator<std::bidirectional_iterator_tag, ValType> {
-        indexed_attr_iterator(indexed_attr& ia, size_t ioi) :
+        indexed_attr_iterator(Ref ia, size_t ioi) :
             ia_(ia), index_of_idx_(ioi) { }
         indexed_attr_iterator(const indexed_attr_iterator& other) :
             ia_(other.ia_), index_of_idx_(other.index_of_idx_) { }
@@ -111,20 +116,24 @@ struct indexed_attr {
             return index_of_idx_ == rhs.index_of_idx_;
         }
 
-        ValType& operator*() { return (*ia_.refer)[ia_.indices[index_of_idx_]]; }
+        ValType& operator*() const { return (*ia_.refer)[ia_.indices[index_of_idx_]]; }
 
         self_type& operator=(const self_type& other) {
             index_of_idx_ = other.index_of_idx_;
         }
     private:
-        indexed_attr& ia_;
+        Ref ia_;
         size_t index_of_idx_;
     };
 
     ContainerRef& refer;
 
     typedef ContainerRef container_type_refernce;
+    typedef T value_type;
     std::vector<size_t> indices;
+
+    typedef indexed_attr_iterator<T, indexed_attr&> iterator;
+    typedef indexed_attr_iterator<const T, const indexed_attr&> const_iterator;
 
     indexed_attr(ContainerRef& r) : refer(r) { }
     indexed_attr(indexed_attr&& idx):
@@ -133,21 +142,11 @@ struct indexed_attr {
     indexed_attr(const indexed_attr& idx):
         refer(idx.refer), indices(idx.indices) { }
 
-    indexed_attr_iterator<T> begin() {
-        return indexed_attr_iterator<T>(*this, 0);
-    }
+    iterator begin() { return iterator(*this, 0); }
+    iterator end() { return iterator(*this, indices.size()); }
 
-    indexed_attr_iterator<T> end() {
-        return indexed_attr_iterator<T>(*this, indices.size());
-    }
-
-    indexed_attr_iterator<const T> begin() const {
-        return indexed_attr_iterator<const T>(*this, 0);
-    }
-
-    indexed_attr_iterator<const T> end() const {
-        return indexed_attr_iterator<const T>(*this, indices.size());
-    }
+    const_iterator begin() const { return const_iterator(*this, 0); }
+    const_iterator end() const { return const_iterator(*this, indices.size()); }
 
     size_t size() const {
         return indices.size();
@@ -219,6 +218,21 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
         uvs(std::move(im.uvs)) { }
 };
 
+struct mesh_uv_sphere : mesh_indexed {
+    mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v);
+
+    mesh_uv_sphere(const mesh_uv_sphere& mp) : mesh_indexed(mp) { }
+    mesh_uv_sphere(mesh_uv_sphere&& mp) : mesh_indexed(std::move(mp)) { }
+};
+
+struct mesh_plane : mesh_indexed {
+    mesh_plane(size_t tesel_x, size_t tesel_y);
+
+    mesh_plane(const mesh_plane& mp) : mesh_indexed(mp) { }
+    mesh_plane(mesh_plane&& mp) : mesh_indexed(std::move(mp)) { }
+};
+
+// well 
 struct mesh_io_object {
     typedef mesh_indexed mesh_type;
     typedef std::vector<mesh_type> meshes_type;
@@ -239,6 +253,55 @@ struct mesh_io_object {
     }
 
     static void load_into_meshes(std::istream& is, meshes_type& ms);
+};
+
+template<typename T>
+struct attr_trait<T, typename std::enable_if<
+        std::is_base_of<shrtool::mesh_base<T>, T>::value>::type> {
+    typedef T input_type;
+    typedef shrtool::indirect_tag transfer_tag;
+    typedef float elem_type;
+    
+    static int slot(const input_type& i, size_t i_s) {
+        switch(i_s) {
+        case 0:
+            if(i.has_positions()) return 0;
+            break;
+        case 1:
+            if(i.has_normals()) return 1;
+            break;
+        case 2:
+            if(i.has_uvs()) return 2;
+            break;
+        }
+
+        return -1;
+    }
+
+    static int count(const input_type& i) {
+        return i.vertices();
+    }
+
+    static int dim(const input_type& i, size_t i_s) {
+        static const int dims[3] = { 4, 3, 3, };
+        return dims[i_s];
+    }
+
+    template<typename Vecs>
+    static void copy_cols(Vecs& vs, elem_type* data) {
+        for(auto& vec : vs) {
+            for(size_t i = 0; i < Vecs::value_type::rows; ++i)
+                *(data++) = vec[i];
+        }
+    }
+
+    static void copy(const input_type& i, size_t i_s, elem_type* data) {
+        switch(i_s) {
+        case 0: copy_cols(i.positions, data); break;
+        case 1: copy_cols(i.normals, data); break;
+        case 2: copy_cols(i.uvs, data); break;
+        }
+    }
 };
 
 }

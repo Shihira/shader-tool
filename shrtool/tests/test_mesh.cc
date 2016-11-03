@@ -120,6 +120,21 @@ TEST_CASE(test_load_multiple_shapes) {
     assert_equal_print(meshes[0].positions.size(), 6u);
 }
 
+TEST_CASE(test_uv_sphere) {
+    mesh_uv_sphere us(2, 6, 3);
+
+    for(size_t i = 0; i < us.triangles(); ++i) {
+        for(size_t j = 0; j < 3; ++j) {
+            assert_float_close(
+                norm(us.get_position(i, j).cutdown<col3>()),
+                2, 0.00001);
+            // need more tests ...
+        }
+    }
+}
+
+#include "providers.h"
+
 int main(int argc, char* argv[])
 {
     test_main(argc, argv);

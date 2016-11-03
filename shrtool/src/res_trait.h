@@ -1,7 +1,12 @@
 #ifndef RES_TRAIT_INCLUDED
 #define RES_TRAIT_INCLUDED
 
-template<typename InputType>
+namespace shrtool {
+
+struct raw_data_tag { };
+struct indirect_tag { };
+
+template<typename InputType, typename Enable = void>
 struct attr_trait {
     /*
      * Please provide:
@@ -25,7 +30,7 @@ struct attr_trait {
     // static void copy(const input_type& i, size_t i_s, elem_type* data);
 };
 
-template<typename InputType>
+template<typename InputType, typename Enable = void>
 struct prop_trait {
     /*
      * Please provide:
@@ -46,7 +51,7 @@ struct prop_trait {
     // static void copy(const input_type& i, float* o);
 };
 
-template<typename InputType>
+template<typename InputType, typename Enable = void>
 struct texture2d_trait {
     // typedef InputType input_type;
 
@@ -67,6 +72,8 @@ struct texture2d_trait {
     //     return i.data();
     // }
 };
+
+}
 
 #endif // RES_TRAIT_INCLUDED
 

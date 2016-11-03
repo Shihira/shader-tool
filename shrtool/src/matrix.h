@@ -563,6 +563,35 @@ public:
     }
 };
 
+template<typename T, size_t M, size_t N>
+std::ostream& operator<<(std::ostream& s, const matrix<T, M, N>& mat) {
+    for(size_t m = 0; m < M; m++) {
+        for(size_t n = 0; n < N; n++)
+            s <<
+                (n == 0 ? (m == 0 ? "[ " : "  ") : "") <<
+                mat.at(m, n) <<
+                (n == N - 1 ? (m == M - 1 ? " ]" : ";\n") : ",\t");
+    }
+    return s;
+}
+
+template<typename T, size_t M>
+std::ostream& operator<<(std::ostream& s, const matrix<T, M, 1>& mat) {
+    for(size_t m = 0; m < M; m++) {
+        s <<
+            (m == 0 ? "[ " : "") <<
+            mat.at(m, 0) <<
+            (m == M - 1 ? " ]ᵀ" : ",\t");
+    }
+    return s;
+}
+
+template<typename IterType, typename VecType>
+std::ostream& operator<<(std::ostream& s,
+        const vector_ref<IterType, VecType>& v) {
+    return operator<<(s, VecType(v));
+}
+
 #undef CSELF
 #undef SSELF
 
@@ -741,35 +770,6 @@ cross(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
             v2[0], v2[1],
         });
     return res;
-}
-
-template<typename T, size_t M, size_t N>
-std::ostream& operator<<(std::ostream& s, const matrix<T, M, N>& mat) {
-    for(size_t m = 0; m < M; m++) {
-        for(size_t n = 0; n < N; n++)
-            s <<
-                (n == 0 ? (m == 0 ? "[ " : "  ") : "") <<
-                mat.at(m, n) <<
-                (n == N - 1 ? (m == M - 1 ? " ]" : ";\n") : ",\t");
-    }
-    return s;
-}
-
-template<typename T, size_t M>
-std::ostream& operator<<(std::ostream& s, const matrix<T, M, 1>& mat) {
-    for(size_t m = 0; m < M; m++) {
-        s <<
-            (m == 0 ? "[ " : "") <<
-            mat.at(m, 0) <<
-            (m == M - 1 ? " ]ᵀ" : ",\t");
-    }
-    return s;
-}
-
-template<typename IterType, typename VecType>
-std::ostream& operator<<(std::ostream& s,
-        const vector_ref<IterType, VecType>& v) {
-    return operator<<(s, VecType(v));
 }
 
 namespace tf {

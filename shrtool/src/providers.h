@@ -12,14 +12,10 @@
 #include "shading.h"
 #include "res_trait.h"
 
-
 namespace shrtool {
 
 template<typename InputType, typename OutputType>
 struct provider { };
-
-struct raw_data_tag { };
-struct indirect_tag { };
 
 template<typename tag>
 struct attr_provider_updater { };

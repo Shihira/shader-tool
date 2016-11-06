@@ -1,5 +1,5 @@
 #define EXPOSE_EXCEPTION
-#include "gui_test.h"
+#include "test_utils.h"
 #include "matrix.h"
 
 using namespace shrtool;

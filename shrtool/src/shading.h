@@ -1,5 +1,5 @@
-#ifndef SHADER_H_INCLUDED
-#define SHADER_H_INCLUDED
+#ifndef SHADING_H_INCLUDED
+#define SHADING_H_INCLUDED
 
 #include <string>
 #include <list>
@@ -184,5 +184,5 @@ public:
 }
 
 
-#endif // SHADER_H_INCLUDED
+#endif // SHADING_H_INCLUDED
 

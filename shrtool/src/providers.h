@@ -3,14 +3,17 @@
 
 /*
  * Providers act a role of bridge connecting resources (meshes, images or
- * suchlike) and render elemnts (textures, buffers, or even shaders). Usually
+ * suchlike) and render assets (textures, buffers, or even shaders). Usually
  * it is has the same lifetime as the resource, or even a member of resource.
+ *
+ * For data that has been fetched from data structures and stored in GPU
+ * resources, we call it PROVIDED by providers.
  */
 
 #include <functional>
 
 #include "shading.h"
-#include "res_trait.h"
+#include "traits.h"
 
 namespace shrtool {
 
@@ -131,7 +134,7 @@ struct prop_provider_updater<indirect_tag> {
                 o.reset(new output_type);
             void* p = o->start_map(render_assets::buffer::WRITE,
                     Trait::size(i));
-            Trait::copy(i, static_cast<
+            Trait::copy(i, reinterpret_cast<
                     decltype(prop_data_type_<Trait>(0))>(p));
             o->stop_map();
         }

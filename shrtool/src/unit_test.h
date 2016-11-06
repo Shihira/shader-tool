@@ -279,5 +279,16 @@ inline int test_main(int argc, char* argv[]) {
 #define assert_float_equal(expr1, expr2) \
     assert_float_close(expr1, expr2, 0.00001)
 
+std::string locate_assets(const std::string& fn)
+{
+    std::string path = getenv("SHR_TEST_ASSETS");
+    if(path.back() == '/' || path.back() == '\\')
+        path += fn;
+    else path += "/" + fn;
+
+    return path;
+}
+
+
 #endif // UNIT_TEST_H_INCLUDED
 

@@ -2,6 +2,8 @@
 #define IMAGE_H_INCLUDED
 
 #include <iostream>
+#include <render_assets.h>
+#include "traits.h"
 
 namespace shrtool {
 
@@ -153,6 +155,29 @@ struct image_io_netpbm {
     }
 
     static void load_into_image(std::istream& is, image& im);
+};
+
+template<>
+struct texture2d_trait<image> {
+    typedef shrtool::raw_data_tag transfer_tag;
+    typedef image input_type;
+
+    static size_t width(const input_type& i) {
+        return i.width();
+    }
+
+    static size_t height(const input_type& i) {
+        return i.height();
+    }
+
+    static shrtool::render_assets::texture2d::format
+    format(const input_type& i) {
+        return shrtool::render_assets::texture2d::RGBA_U8888;
+    }
+
+    static const void* data(const input_type& i) {
+        return i.data();
+    }
 };
 
 }

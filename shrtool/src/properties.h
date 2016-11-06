@@ -5,95 +5,19 @@
 #include <sstream>
 
 #include "matrix.h"
+#include "traits.h"
 
 namespace shrtool {
 
 ////////////////////////////////////////////////////////////////////////////////
 // universal_property
 
-template<typename T>
-struct plain_item_trait
-{
-    typedef T value_type;
-    static constexpr size_t size = sizeof(value_type);
-    static constexpr size_t align = sizeof(value_type);
-
-    static void copy(const T& v, value_type* buf) { *buf = v; }
-    static const char* type_name() { return "unknown"; }
-};
-
-template<typename T>
-struct item_trait : plain_item_trait<T> { };
-
-template<>
-struct item_trait<char> : plain_item_trait<char>
-{
-    static const char* type_name() { return "byte"; }
-};
-
-template<>
-struct item_trait<int> : plain_item_trait<int>
-{
-    static const char* type_name() { return "int"; }
-};
-
-template<>
-struct item_trait<double> : plain_item_trait<double>
-{
-    static const char* type_name() { return "double"; }
-};
-
-template<>
-struct item_trait<float> : plain_item_trait<float>
-{
-    static const char* type_name() { return "float"; }
-};
-
-// col-major matrix
-template<typename T, size_t M, size_t N>
-struct item_trait<math::matrix<T, M, N>>
-{
-    typedef float value_type;
-    static constexpr size_t size = M * N * sizeof(value_type);
-    static constexpr size_t align = item_trait<math::col<value_type, M>>::align;
-
-    static void copy(const math::matrix<T, M, N>& m, value_type* buf) {
-        for(size_t n = 0; n < N; ++n, buf += M) {
-            auto& c = m.col(n);
-            std::copy(c.begin(), c.end(), buf);
-        }
-    }
-
-    static const char* type_name() {
-        static const char name_[] = {
-            'm', 'a', 't', M + '0',
-            M == N ? '\0' : 'x', N + '0', '\0' };
-        return name_;
-    }
-};
-
-template<typename T, size_t M>
-struct item_trait<math::matrix<T, M, 1>>
-{
-    typedef T value_type;
-    static constexpr size_t size = M * sizeof(value_type);
-    static constexpr size_t align = (M < 3 ? M : 4) * sizeof(value_type);
-
-    static void copy(const math::col<T, M>& c, value_type* buf) {
-        std::copy(c.begin(), c.end(), buf);
-    }
-
-    static const char* type_name() {
-        static const char name_[] = {
-            std::is_same<value_type, uint8_t>::value ? 'b' :
-            std::is_same<value_type, int>::value ? 'i' :
-            std::is_same<value_type, double>::value ? 'd' : '\0',
-            'v', 'e', 'c', M + '0', '\0' };
-        static const char* name_p = name_[0] ? name_ : name_ + 1;
-
-        return name_p;
-    }
-};
+/*
+ * Universal Property is a tuple-like data structure that can store many types
+ * of data (those acceptable for OpenGL driver). It is totally static, computes
+ * size, transforms data, computes align in a totally static way, hence it has
+ * high efficiency.
+ */
 
 template<typename T, typename ...Args>
 struct universal_property : universal_property<Args...>
@@ -161,7 +85,7 @@ item_get(universal_property<Args...>& up)
 {
     typedef typename universal_property_item<
         I, universal_property<Args...>>::prop_type tail;
-    return static_cast<tail*>(&up)->data;
+    return static_cast<tail&>(up).data;
 }
 
 template<size_t I, typename ...Args>
@@ -171,7 +95,7 @@ item_get(const universal_property<Args...>& up)
 {
     typedef typename universal_property_item<
         I, universal_property<Args...>>::prop_type tail;
-    return static_cast<const tail*>(&up)->data;
+    return static_cast<const tail&>(up).data;
 }
 
 template<typename ...Args>
@@ -216,15 +140,17 @@ constexpr size_t property_size(const UniProp&)
         universal_property_item<UniProp::count - 1, UniProp>::trait::size;
 }
 
+template<typename UniProp>
 std::string item_list_definition__() { return ""; }
 
 template<typename UniProp, typename ...Args>
 std::string item_list_definition__(
         std::string head, Args ...names)
 {
-    return std::string("    ") + universal_property_item<
-            UniProp::count - 1, UniProp>::trait::type_name() +
-        " " + head + ";\n" + item_list_definition__(names...);
+    return std::string("    ") +
+        universal_property_item<0, UniProp>::trait::type_name() +
+        " " + head + ";\n" +
+        item_list_definition__<typename UniProp::parent_type>(names...);
 }
 
 template<typename UniProp, typename ...Args>
@@ -241,6 +167,46 @@ template<size_t I, typename UniProp, size_t StartAt = 0>
 constexpr size_t item_offset(const UniProp&) {
     return item_offset__<I, StartAt, UniProp>::value;
 }
+
+template<size_t I, typename UniProp, size_t StartAt = 0>
+constexpr size_t item_offset() {
+    return item_offset__<I, StartAt, UniProp>::value;
+}
+
+}
+
+namespace shrtool {
+
+template<typename ...Args>
+struct prop_trait<universal_property<Args...>> {
+    typedef universal_property<Args...> input_type;
+    typedef shrtool::indirect_tag transfer_tag;
+    typedef uint8_t value_type;
+
+private:
+    template<size_t OrgI>
+    static void copy__(const void* up, uint8_t* o) { /* do nothing */ }
+
+    template<size_t OrgI, typename UniProp>
+    static void copy__(const UniProp* up, uint8_t* o) {
+        typedef item_trait<typename UniProp::value_type> trait;
+        uint8_t* off_o = o + item_offset<OrgI, input_type>();
+
+        trait::copy(up->data,
+            reinterpret_cast<typename trait::value_type*>(off_o));
+
+        copy__<OrgI + 1>((const typename UniProp::parent_type*)up, o);
+    }
+
+public:
+    static size_t size(const input_type& i) {
+        return property_size(i);
+    }
+
+    static void copy(const input_type& i, uint8_t* o) {
+        copy__<0, input_type>(&i, o);
+    }
+};
 
 }
 

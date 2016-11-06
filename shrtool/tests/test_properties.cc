@@ -1,10 +1,16 @@
 #include "unit_test.h"
-#include "utils.h"
+#include "properties.h"
 
 using namespace std;
 using namespace shrtool;
 using namespace shrtool::unit_test;
 
+/*
+ * What it does:
+ *
+ *  trim_str(" a b    cde\t f") == "a b cde f"
+ *  trim_str("a\tb  cde\n f      ") == "a b cde f"
+ */
 string trim_str(const string& s)
 {
     string res;
@@ -55,7 +61,7 @@ TEST_CASE(test_universal_property_single_item)
         trim_str("uniform blockName { vec3 diffuseColor; };"));
 }
 
-TEST_CASE(test_universal_property_correct_align)
+TEST_CASE(test_universal_property_multiple)
 {
     universal_property<
         math::col4,
@@ -87,6 +93,27 @@ TEST_CASE(test_universal_property_correct_align)
     assert_equal_print(item_offset<5>(up_2), 19 * szf + szb);
     assert_equal_print(item_offset<7>(up_2), 3 * 4 * szd);
     assert_equal_print(item_offset<8>(up_2), 3 * 4 * szd + 3 * szd);
+
+    assert_equal_print(
+        trim_str(property_glsl_definition(
+            up_2, "fuckingBlock",
+            "mat_abc", "damn", "hell_int",
+            "kuso", "shit1", "shit2", "shit3",
+            "jim", "jam")
+        ),
+
+        trim_str(R"EOF(
+            uniform fuckingBlock {
+                mat4x3 mat_abc;
+                vec3 damn;
+                int hell_int;
+                vec3 kuso;
+                byte shit1;
+                byte shit2;
+                byte shit3;
+                dvec3 jim;
+                double jam;
+            };)EOF"));
 }
 
 int main(int argc, char* argv[])

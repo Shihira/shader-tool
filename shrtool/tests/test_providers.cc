@@ -1,7 +1,7 @@
 #include <vector>
 
 #define EXPOSE_EXCEPTION
-#include "gui_test.h"
+#include "test_utils.h"
 #include "providers.h"
 
 using namespace shrtool;

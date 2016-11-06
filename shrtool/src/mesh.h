@@ -8,7 +8,7 @@
 
 #include "matrix.h"
 #include "image.h"
-#include "res_trait.h"
+#include "traits.h"
 
 namespace shrtool {
 

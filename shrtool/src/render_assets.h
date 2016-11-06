@@ -231,6 +231,14 @@ class property_buffer : public buffer {
     bool first_map = true;
 
 public:
+    template<typename T>
+    void write(const T* data, size_t sz = 0) {
+        // in property buffer we do not care about its actual type
+        // so just uniformly set it to BYTE: don't be surprised :)
+        etype_ = element_type::BYTE;
+        write_raw(data, sz * sizeof(T));
+    }
+
     void write_raw(const void* data, size_t sz = 0) override;
     void read_raw(void* data, size_t sz = 0) override;
     using buffer::buffer;

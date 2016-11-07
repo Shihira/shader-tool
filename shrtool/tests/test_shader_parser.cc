@@ -5,8 +5,6 @@
 #include <sstream>
 #include <fstream>
 
-#include "libguile.h"
-
 #include "unit_test.h"
 #include "shader_parser.h"
 
@@ -115,6 +113,5 @@ TEST_CASE(test_parse_blinn_phong_sample) {
 
 int main(int argc, char* argv[])
 {
-    scm_init_guile();
     return unit_test::test_main(argc, argv);
 }

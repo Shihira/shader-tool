@@ -31,9 +31,9 @@ foreach(EXEC_NAME ${TESTS_REQUIRING_GL_CONTEXT})
         ${OPENGL_gl_LIBRARY} ${GLEW_LIBRARY} ${GLFW_LIBRARY})
 endforeach(EXEC_NAME)
 
-find_package(Guile REQUIRED)
+find_package(Chibi_Scheme REQUIRED)
 
-include_directories(test_shader_parser ${Guile_INCLUDE_DIR})
-target_link_libraries(test_shader_parser ${Guile_LIBRARY})
+include_directories(test_shader_parser ${Chibi_Scheme_INCLUDE_DIR})
+target_link_libraries(test_shader_parser ${Chibi_Scheme_LIBRARY})
 
 

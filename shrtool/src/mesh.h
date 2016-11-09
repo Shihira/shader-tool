@@ -28,6 +28,7 @@ private:
     }
 
 public:
+    typedef void mesh_tag;
     /*
      * // provide at least these member variables as follow
      * // where Container supports size() and operator[](size_t)
@@ -51,13 +52,13 @@ public:
         { return self().positions[tri * 3 + vert]; }
     const math::col4& get_position(size_t tri, size_t vert) const
         { return self().positions[tri * 3 + vert]; }
-    math::col4& get_normal(size_t tri, size_t vert)
+    math::col3& get_normal(size_t tri, size_t vert)
         { return self().normals[tri * 3 + vert]; }
-    const math::col4& get_normal(size_t tri, size_t vert) const
+    const math::col3& get_normal(size_t tri, size_t vert) const
         { return self().normals[tri * 3 + vert]; }
-    math::col4& get_uv(size_t tri, size_t vert)
+    math::col3& get_uv(size_t tri, size_t vert)
         { return self().uvs[tri * 3 + vert]; }
-    const math::col4& get_uv(size_t tri, size_t vert) const
+    const math::col3& get_uv(size_t tri, size_t vert) const
         { return self().uvs[tri * 3 + vert]; }
 
     size_t triangles() const { return vertices() / 3; }
@@ -219,7 +220,8 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
 };
 
 struct mesh_uv_sphere : mesh_indexed {
-    mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v);
+    mesh_uv_sphere(double radius,
+            size_t tesel_u, size_t tesel_v, bool smooth = true);
 
     mesh_uv_sphere(const mesh_uv_sphere& mp) : mesh_indexed(mp) { }
     mesh_uv_sphere(mesh_uv_sphere&& mp) : mesh_indexed(std::move(mp)) { }
@@ -256,8 +258,7 @@ struct mesh_io_object {
 };
 
 template<typename T>
-struct attr_trait<T, typename std::enable_if<
-        std::is_base_of<shrtool::mesh_base<T>, T>::value>::type> {
+struct attr_trait<T, typename T::mesh_tag> {
     typedef T input_type;
     typedef shrtool::indirect_tag transfer_tag;
     typedef float elem_type;

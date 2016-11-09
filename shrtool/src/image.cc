@@ -45,7 +45,7 @@ static void load_netpbm_body_plain(std::istream& is, image& im, size_t space)
                 else throw parse_error("Bad Netpbm image: body");
             }
 
-            uint8_t comp_byte;
+            uint8_t comp_byte = comp;
             if(space > 255)
                 comp_byte = comp / ((space + 1) / 256);
             else if(space < 255)
@@ -69,7 +69,7 @@ static void load_netpbm_body_raw(std::istream& is, image& im, size_t space)
                 else throw parse_error("Bad Netpbm image: body");
             }
 
-            uint8_t comp_byte;
+            uint8_t comp_byte = comp;
             if(space > 255)
                 comp_byte = comp / ((space + 1) / 256);
             else if(space < 255)

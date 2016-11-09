@@ -138,7 +138,7 @@ void shader::add_sub_shader(shader::sub_shader_ptr p) {
 
 void shader::property_binding(const std::string& name, size_t binding) {
     if(property_binding_.find(name) != property_binding_.end())
-        throw shader_error("Uniform" + name + "has bounded.");
+        throw shader_error("Uniform" + name + "has bound.");
 
     glUseProgram(id());
     GLuint idx = glGetUniformBlockIndex(id(), name.c_str());

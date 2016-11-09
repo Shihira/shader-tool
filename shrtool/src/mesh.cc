@@ -169,7 +169,8 @@ void mesh_io_object::load_into_meshes(
     }
 }
 
-mesh_uv_sphere::mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v)
+mesh_uv_sphere::mesh_uv_sphere(double radius,
+        size_t tesel_u, size_t tesel_v, bool smooth)
 {
     if(tesel_u < 3 || tesel_v < 2) return;
 
@@ -181,14 +182,16 @@ mesh_uv_sphere::mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v)
         // by y) intersects with the sphere.
         double r_ = radius * std::sin(angle_v);
 
-        for(size_t u = 0; u < tesel_u; ++u) {
+        for(size_t u = 0; u <= tesel_u; ++u) {
             double angle_u = double(u) / tesel_u * math::PI * 2;
             double x = r_ * std::cos(angle_u);
             double z = r_ * std::sin(angle_u);
 
             stor_positions->push_back(col4{x, y, z, 1});
-            stor_normals->push_back(col3{x/radius, y/radius, z/radius});
-            stor_uvs->push_back(col3{double(u) / tesel_u,
+            if(smooth)
+                // the normal cannot be found until triangles are generated
+                stor_normals->push_back(col3{x/radius, y/radius, z/radius});
+            stor_uvs->push_back(col3{1 - double(u) / tesel_u,
                     double(v) / tesel_v, 1});
 
             // take the center point of each grid in textures on polars
@@ -200,19 +203,32 @@ mesh_uv_sphere::mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v)
     // generate triangles
     for(size_t v = 0; v < tesel_v; ++v) {
         for(size_t u = 0; u < tesel_u; ++u) {
-            size_t i = v * tesel_v + u;
-            size_t i_r = v * tesel_v + (u + 1) % tesel_u;
-            size_t i_b = i + tesel_u;
-            size_t i_rb = i_r + tesel_u;
+            size_t i = v * (tesel_u + 1) + u;
+            size_t i_r = v * (tesel_u + 1) + u + 1;
+            size_t i_b = i + tesel_u + 1;
+            size_t i_rb = i_r + tesel_u + 1;
+
+            size_t non_smth_ni = 0;
+
+            if(!smooth) {
+                col4 nml =
+                    stor_positions->at(i) +
+                    stor_positions->at(i_r) +
+                    stor_positions->at(i_b) +
+                    stor_positions->at(i_rb) / 4;
+                nml /= math::norm(nml);
+                non_smth_ni = stor_normals->size();
+                stor_normals->push_back(nml.cutdown<col3>());
+            }
 
             if(v != 0) { // not north polar
                 positions.indices.push_back(i_r);
                 positions.indices.push_back(i);
                 positions.indices.push_back(i_b);
 
-                normals.indices.push_back(i_r);
-                normals.indices.push_back(i);
-                normals.indices.push_back(i_b);
+                normals.indices.push_back(!smooth ? non_smth_ni : i_r);
+                normals.indices.push_back(!smooth ? non_smth_ni : i);
+                normals.indices.push_back(!smooth ? non_smth_ni : i_b);
 
                 uvs.indices.push_back(i_r);
                 uvs.indices.push_back(i);
@@ -224,9 +240,9 @@ mesh_uv_sphere::mesh_uv_sphere(double radius, size_t tesel_u, size_t tesel_v)
                 positions.indices.push_back(i_rb);
                 positions.indices.push_back(i_r);
 
-                normals.indices.push_back(i_b);
-                normals.indices.push_back(i_rb);
-                normals.indices.push_back(i_r);
+                normals.indices.push_back(!smooth ? non_smth_ni : i_b);
+                normals.indices.push_back(!smooth ? non_smth_ni : i_rb);
+                normals.indices.push_back(!smooth ? non_smth_ni : i_r);
 
                 uvs.indices.push_back(i_b);
                 uvs.indices.push_back(i_rb);

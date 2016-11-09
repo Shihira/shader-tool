@@ -91,7 +91,7 @@ public:
         w_(width), h_(height) {
         internal_format(ifmt);
     }
-    void fill(void* data, format fmt);
+    void fill(const void* data, format fmt);
 
     size_t width() const { return w_; }
     void width(size_t w) { w_ = w; }

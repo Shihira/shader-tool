@@ -123,13 +123,25 @@ TEST_CASE(test_load_multiple_shapes) {
 TEST_CASE(test_uv_sphere) {
     mesh_uv_sphere us(2, 6, 3);
 
+    assert_true(us.has_positions());
+    assert_true(us.has_normals());
+    assert_true(us.has_uvs());
+
     for(size_t i = 0; i < us.triangles(); ++i) {
         for(size_t j = 0; j < 3; ++j) {
             assert_float_close(
                 norm(us.get_position(i, j).cutdown<col3>()),
                 2, 0.00001);
+            assert_float_close(
+                norm(us.get_normal(i, j)),
+                1, 0.00001);
             // need more tests ...
         }
+
+        float area = norm(cross(
+            (us.get_position(i, 1) - us.get_position(i, 0)).cutdown<fcol3>(),
+            (us.get_position(i, 2) - us.get_position(i, 1)).cutdown<fcol3>()));
+        assert_true(area > 0.000001);
     }
 }
 

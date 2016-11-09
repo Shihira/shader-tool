@@ -14,6 +14,7 @@ DEF_ENUM_MAP(em_glsl_type_name__, layout::item_type, const char*, ({
         { layout::MAT4, "mat4" },
         { layout::INT, "int" },
         { layout::FLOAT, "float" },
+        { layout::TEX2D, "sampler2D" },
     }))
 
 DEF_ENUM_MAP(em_sexp_sym_type_name__, std::string, layout::item_type, ({
@@ -24,6 +25,8 @@ DEF_ENUM_MAP(em_sexp_sym_type_name__, std::string, layout::item_type, ({
         { "mat4", layout::MAT4 },
         { "int", layout::INT },
         { "float", layout::FLOAT },
+        { "tex2d", layout::TEX2D },
+        { "texcubemap", layout::TEXCUBEMAP },
     }))
 
 std::string layout::glsl_type_name(layout::item_type t)
@@ -33,7 +36,7 @@ std::string layout::glsl_type_name(layout::item_type t)
 
 }
 
-#include <chibi/sexp.h>
+#include <chibi/eval.h>
 
 namespace shrtool {
 
@@ -130,6 +133,59 @@ void shader_parser::load_shader(std::istream& is, shader_info& s)
     }
 
     sexp_release_object(parse_ctx, shader_list);
+}
+
+std::string layout::make_source_as_attr() const
+{
+    std::string src;
+    for(size_t i = 0; i < value.size(); ++i) {
+        if(value[i].first >= TEX2D)
+            throw unsupported_error("Unable to pass textures as attributes");
+        src += "layout (location = " + std::to_string(i) + ") in " +
+            layout::glsl_type_name(value[i].first) +
+            " " + value[i].second + ";\n";
+    }
+
+    return src;
+}
+
+std::string layout::make_source_as_prop(const std::string& n) const
+{
+    std::string src = "uniform " + n + " {\n";
+    std::vector<const type_name_pair*> textures;
+
+    for(auto& li : value) {
+        if(li.first >= TEX2D) {
+            textures.push_back(&li);
+            continue;
+        }
+
+        src += "    " + layout::glsl_type_name(li.first) +
+            " " + li.second + ";\n";
+    }
+    src += "};\n";
+
+    for(auto* li : textures) {
+        src += "uniform " + layout::glsl_type_name(li->first)
+            + " " + li->second + ";\n";
+    }
+    return src;
+}
+
+std::string sub_shader_info::make_source(const shader_info& parent) const
+{
+    std::string src;
+    src += "#version " + version + "\n";
+
+    for(auto& p : parent.property_groups)
+        src += p.second.make_source_as_prop(p.first);
+
+    if(type == shader::VERTEX)
+        src += parent.attributes.make_source_as_attr();
+
+    src += source;
+
+    return src;
 }
 
 }

@@ -63,7 +63,7 @@ __DEF_GEN_DEL_CONSTRUCT_OBJECT(buffer, glGenBuffers, glDeleteBuffers)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void texture2d::fill(void* data, format fmt) {
+void texture2d::fill(const void* data, format fmt) {
     glBindTexture(GL_TEXTURE_2D, id());
     format ifmt = internal_format() == DEFAULT_FMT ? fmt : internal_format();
     glTexImage2D(

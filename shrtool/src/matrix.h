@@ -791,21 +791,21 @@ template<typename T = double>
 inline matrix<T, 4, 4> rotate(double a, plane p)
 {
     if(p == xOy)
-        return mat4 {
+        return matrix<T, 4, 4> {
             cos(a),-sin(a), 0, 0,
             sin(a), cos(a), 0, 0,
             0,      0,      1, 0,
             0,      0,      0, 1,
         };
     else if(p == yOz)
-        return mat4 {
+        return matrix<T, 4, 4> {
             1, 0,      0,      0,
             0, cos(a), sin(a), 0,
             0,-sin(a), cos(a), 0,
             0, 0,      0,      1,
         };
     else
-        return mat4 {
+        return matrix<T, 4, 4> {
             cos(a), 0,-sin(a), 0,
             0,      1, 0,      0,
             sin(a), 0, cos(a), 0,
@@ -837,7 +837,7 @@ inline matrix<T, 4, 4> perspective(double fov, double wh, double zn, double zf)
 {
     double f = 1 / tan(fov);
     double c = zn - zf;
-    return mat4 {
+    return matrix<T, 4, 4> {
         f / wh, 0, 0, 0,
         0, f, 0, 0,
         0, 0, (zn + zf) / c, 2 * zn * zf / c,
@@ -854,7 +854,7 @@ inline matrix<T, 4, 4> orthographic(
     double  r_l = r - l,
             t_b = t - b,
             f_n = f - n;
-    return mat4 {
+    return matrix<T, 4, 4> {
         2/r_l, 0, 0, -(r+l)/r_l,
         0, 2/t_b, 0, -(t+b)/t_b,
         0, 0, 2/f_n, -(f+n)/f_n,

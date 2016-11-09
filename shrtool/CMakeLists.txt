@@ -13,6 +13,11 @@ set(TESTS_REQUIRING_GL_CONTEXT
         test_prov_shading
     )
 
+set(TESTS_REQUIRING_CHIBI
+        test_shader_parser
+        test_prov_shading
+    )
+
 file(GLOB_RECURSE ALL_UNIT_TESTS tests/test_*.cc)
 
 foreach(TEST_FILE ${ALL_UNIT_TESTS})
@@ -31,9 +36,11 @@ foreach(EXEC_NAME ${TESTS_REQUIRING_GL_CONTEXT})
         ${OPENGL_gl_LIBRARY} ${GLEW_LIBRARY} ${GLFW_LIBRARY})
 endforeach(EXEC_NAME)
 
-find_package(Chibi_Scheme REQUIRED)
+foreach(EXEC_NAME ${TESTS_REQUIRING_CHIBI})
+    find_package(Chibi_Scheme REQUIRED)
 
-include_directories(test_shader_parser ${Chibi_Scheme_INCLUDE_DIR})
-target_link_libraries(test_shader_parser ${Chibi_Scheme_LIBRARY})
+    include_directories(${EXEC_NAME} ${Chibi_Scheme_INCLUDE_DIR})
+    target_link_libraries(${EXEC_NAME} ${Chibi_Scheme_LIBRARY})
+endforeach(EXEC_NAME)
 
 

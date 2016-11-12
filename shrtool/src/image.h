@@ -107,6 +107,9 @@ public:
         return *this;
     }
 
+    void flip_h();
+    void flip_v();
+
     size_t width() const { return width_; }
     size_t height() const { return height_; }
 
@@ -154,7 +157,13 @@ struct image_io_netpbm {
         return is;
     }
 
+    std::ostream& operator()(std::ostream& os) {
+        save_image(os, *img);
+        return os;
+    }
+
     static void load_into_image(std::istream& is, image& im);
+    static void save_image(std::ostream& os, const image& im);
 };
 
 template<>

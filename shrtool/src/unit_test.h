@@ -281,7 +281,10 @@ inline int test_main(int argc, char* argv[]) {
 
 std::string locate_assets(const std::string& fn)
 {
-    std::string path = getenv("SHR_TEST_ASSETS");
+    const char* cp = getenv("SHRTOOL_ASSETS_DIR");
+    if(!cp) return fn;
+
+    std::string path = cp;
     if(path.back() == '/' || path.back() == '\\')
         path += fn;
     else path += "/" + fn;

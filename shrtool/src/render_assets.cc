@@ -11,16 +11,19 @@ namespace render_assets {
 DEF_ENUM_MAP(em_format_component_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_RGBA },
         { texture::R_F32, GL_R },
+        { texture::DEPTH_F32, GL_DEPTH_COMPONENT },
     }))
 
 DEF_ENUM_MAP(em_format_type_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_UNSIGNED_BYTE },
         { texture::R_F32, GL_FLOAT },
+        { texture::DEPTH_F32, GL_FLOAT },
     }))
 
 DEF_ENUM_MAP(em_format_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_RGBA8 },
         { texture::R_F32, GL_R32F },
+        { texture::DEPTH_F32, GL_DEPTH_COMPONENT32F },
     }))
 
 DEF_ENUM_MAP(em_component_, texture_cubemap2d::face_index, GLenum, ({
@@ -79,6 +82,14 @@ void texture2d::fill(const void* data, format fmt) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
             em_filter_type_(filter()));
     glGenerateMipmap(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, GL_NONE);
+    filled_ = true;
+}
+
+void texture2d::read(void* data, format fmt) {
+    glBindTexture(GL_TEXTURE_2D, id());
+    glGetTexImage(GL_TEXTURE_2D, 0,
+            em_format_component_(fmt), em_format_type_(fmt), data);
     glBindTexture(GL_TEXTURE_2D, GL_NONE);
 }
 

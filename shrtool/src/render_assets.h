@@ -61,6 +61,7 @@ public:
         DEFAULT_FMT,
         RGBA_U8888,
         R_F32,
+        DEPTH_F32,
     };
 
     id_type create_object() const;
@@ -85,13 +86,16 @@ public:
 class texture2d : public texture {
     size_t w_;
     size_t h_;
+    bool filled_ = false;
 
 public:
     texture2d(size_t width, size_t height, format ifmt = DEFAULT_FMT) :
         w_(width), h_(height) {
         internal_format(ifmt);
     }
+    void reserve() { if(!filled_) fill(nullptr, internal_format()); }
     void fill(const void* data, format fmt);
+    void read(void* data, format fmt);
 
     size_t width() const { return w_; }
     void width(size_t w) { w_ = w; }

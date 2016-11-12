@@ -52,6 +52,7 @@ struct parse_ctx__ : generic_singleton<parse_ctx__> {
         ctx = sexp_make_eval_context(NULL, NULL, NULL, 0, 0);
         sexp_load_standard_env(ctx, NULL, SEXP_SEVEN);
         sexp_load_standard_ports(ctx, NULL, stdin, stdout, stderr, 0);
+        sexp_eval_string(ctx, "(import (shrtool))", -1, NULL);
     }
 
     ~parse_ctx__() {
@@ -84,6 +85,11 @@ void shader_parser::load_shader(std::istream& is, shader_info& s)
             scheme_code.c_str(), scheme_code.size(), NULL);
     sexp_preserve_object(parse_ctx, shader_list);
 
+    if(sexp_exceptionp(shader_list)) {
+        sexp_print_exception(parse_ctx, shader_list,
+                sexp_current_error_port(parse_ctx));
+        throw unsupported_error("Shader is not a proper list.");
+    }
     if(!sexp_listp(parse_ctx, shader_list))
         throw unsupported_error("Shader is not a proper list.");
 

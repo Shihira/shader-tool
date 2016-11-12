@@ -228,7 +228,8 @@ struct mesh_uv_sphere : mesh_indexed {
 };
 
 struct mesh_plane : mesh_indexed {
-    mesh_plane(size_t tesel_x, size_t tesel_y);
+    mesh_plane(double w, double h,
+            size_t tesel_u, size_t tesel_v);
 
     mesh_plane(const mesh_plane& mp) : mesh_indexed(mp) { }
     mesh_plane(mesh_plane&& mp) : mesh_indexed(std::move(mp)) { }

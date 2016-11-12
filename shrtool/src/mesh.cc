@@ -252,8 +252,53 @@ mesh_uv_sphere::mesh_uv_sphere(double radius,
     }
 }
 
-mesh_plane::mesh_plane(size_t tesel_x, size_t tesel_y)
+mesh_plane::mesh_plane(double w, double h,
+        size_t tesel_u, size_t tesel_v)
 {
+    double half_w = w / 2, half_h = h / 2;
+    for(size_t cur_u = 0; cur_u <= tesel_u; ++cur_u)
+        for(size_t cur_v = 0; cur_v <= tesel_v; ++cur_v) {
+            stor_positions->push_back(col4{
+                    double(cur_u) / tesel_u * w - half_w, 0,
+                    double(cur_v) / tesel_v * h - half_h, 1});
+            stor_normals->push_back(col3{0, 1, 0});
+            stor_uvs->push_back(col3{
+                    double(cur_u) / tesel_u,
+                    double(cur_v) / tesel_v, 1});
+        }
+
+    for(size_t v = 0; v < tesel_v; ++v) {
+        for(size_t u = 0; u < tesel_u; ++u) {
+            size_t i = v * (tesel_u + 1) + u;
+            size_t i_r = v * (tesel_u + 1) + u + 1;
+            size_t i_b = i + tesel_u + 1;
+            size_t i_rb = i_r + tesel_u + 1;
+
+            positions.indices.push_back(i_r);
+            positions.indices.push_back(i);
+            positions.indices.push_back(i_b);
+
+            normals.indices.push_back(i_r);
+            normals.indices.push_back(i);
+            normals.indices.push_back(i_b);
+
+            uvs.indices.push_back(i_r);
+            uvs.indices.push_back(i);
+            uvs.indices.push_back(i_b);
+
+            positions.indices.push_back(i_b);
+            positions.indices.push_back(i_rb);
+            positions.indices.push_back(i_r);
+
+            normals.indices.push_back(i_b);
+            normals.indices.push_back(i_rb);
+            normals.indices.push_back(i_r);
+
+            uvs.indices.push_back(i_b);
+            uvs.indices.push_back(i_rb);
+            uvs.indices.push_back(i_r);
+        }
+    }
 }
 
 }

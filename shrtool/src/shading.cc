@@ -57,7 +57,7 @@ id_type render_target::create_object() const {
 }
 
 void render_target::destroy_object(id_type i) const {
-    if(screen_) glDeleteFramebuffers(1, &i);
+    if(!isscr()) glDeleteFramebuffers(1, &i);
 }
 
 id_type sub_shader::create_object() const {
@@ -100,6 +100,7 @@ void render_target::set_viewport(size_t x, size_t y, size_t w, size_t h) {
 void render_target::render_texture(
         render_target::buffer_attachment ba,
         render_assets::texture2d &tex) {
+    tex.reserve();
     glBindFramebuffer(GL_FRAMEBUFFER, id());
     glFramebufferTexture2D(GL_FRAMEBUFFER, em_buffer_attachment_(ba),
             GL_TEXTURE_2D, tex.id(), 0);
@@ -109,6 +110,10 @@ void render_target::render_texture(
     viewport_[1] = 0;
     viewport_[2] = tex.width();
     viewport_[3] = tex.height();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, id());
+    glViewport(0, 0, tex.width(), tex.height());
+    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
 void render_target::clear_buffer(render_target::buffer_attachment ba) {
@@ -120,7 +125,7 @@ void render_target::clear_buffer(render_target::buffer_attachment ba) {
             );
     } else if(ba == DEPTH_BUFFER) {
         glClearDepth(init_depth_);
-        glDepthFunc(GL_LEQUAL);
+        glDepthFunc(GL_LESS);
     }
     glClear(em_clear_mask_(ba));
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);

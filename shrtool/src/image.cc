@@ -121,4 +121,31 @@ void image_io_netpbm::load_into_image(std::istream& is, image& im)
         throw unsupported_error("Format other than PPM is unsupported");
 }
 
+void image_io_netpbm::save_image(std::ostream& os, const image& im)
+{
+    os << "P6\n# created by shrtool\n"
+        << im.width() << ' ' << im.height() << "\n255\n";
+    for(const color& c : im) {
+        os.put(c.data.comp.r);
+        os.put(c.data.comp.g);
+        os.put(c.data.comp.b);
+    }
+}
+
+void image::flip_h()
+{
+    for(size_t r = 0; r < height(); r++) {
+        for(size_t i = 0, j = width() - 1; i < j; ++i, --j)
+            std::swap(pixel(i, r), pixel(j, r));
+    }
+}
+
+void image::flip_v()
+{
+    for(size_t c = 0; c < width(); c++) {
+        for(size_t i = 0, j = height() - 1; i < j; ++i, --j)
+            std::swap(pixel(c, i), pixel(c, j));
+    }
+}
+
 }

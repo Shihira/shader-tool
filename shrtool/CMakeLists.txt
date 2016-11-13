@@ -13,7 +13,7 @@ set(TESTS_REQUIRING_GL_CONTEXT
         test_prov_shading
     )
 
-set(TESTS_REQUIRING_CHIBI
+set(TESTS_REQUIRING_GUILE
         test_shader_parser
         test_prov_shading
     )
@@ -36,11 +36,11 @@ foreach(EXEC_NAME ${TESTS_REQUIRING_GL_CONTEXT})
         ${OPENGL_gl_LIBRARY} ${GLEW_LIBRARY} ${GLFW_LIBRARY})
 endforeach(EXEC_NAME)
 
-foreach(EXEC_NAME ${TESTS_REQUIRING_CHIBI})
-    find_package(Chibi_Scheme REQUIRED)
+foreach(EXEC_NAME ${TESTS_REQUIRING_GUILE})
+    find_package(Guile REQUIRED)
 
-    include_directories(${EXEC_NAME} ${Chibi_Scheme_INCLUDE_DIR})
-    target_link_libraries(${EXEC_NAME} ${Chibi_Scheme_LIBRARY})
+    include_directories(${EXEC_NAME} ${Guile_INCLUDE_DIR})
+    target_link_libraries(${EXEC_NAME} ${Guile_LIBRARY})
 endforeach(EXEC_NAME)
 
 

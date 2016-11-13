@@ -24,12 +24,14 @@ DEF_ENUM_MAP(em_shader_type_str_, shader::shader_type, const char*, ({
 DEF_ENUM_MAP(em_buffer_attachment_, render_target::buffer_attachment, GLenum, ({
         { render_target::COLOR_BUFFER_0, GL_COLOR_ATTACHMENT0 },
         { render_target::COLOR_BUFFER_1, GL_COLOR_ATTACHMENT1 },
+        { render_target::COLOR_BUFFER_2, GL_COLOR_ATTACHMENT2 },
+        { render_target::COLOR_BUFFER_3, GL_COLOR_ATTACHMENT3 },
         { render_target::DEPTH_BUFFER,   GL_DEPTH_ATTACHMENT },
     }))
 
-DEF_ENUM_MAP(em_clear_mask_, render_target::buffer_attachment, GLbitfield, ({
-        { render_target::COLOR_BUFFER, GL_COLOR_BUFFER_BIT },
-        { render_target::DEPTH_BUFFER, GL_DEPTH_BUFFER_BIT },
+DEF_ENUM_MAP(em_clear_mask_, render_target::buffer_attachment, GLenum, ({
+        { render_target::COLOR_BUFFER, GL_COLOR },
+        { render_target::DEPTH_BUFFER, GL_DEPTH },
     }))
 
 DEF_ENUM_MAP(em_element_type_, element_type::element_type_e, GLenum, ({
@@ -119,15 +121,14 @@ void render_target::render_texture(
 void render_target::clear_buffer(render_target::buffer_attachment ba) {
     glBindFramebuffer(GL_FRAMEBUFFER, id());
     if(ba == COLOR_BUFFER) {
-        glClearColor(
-                init_color_[0], init_color_[1],
-                init_color_[2], init_color_[3]
-            );
+        glClearBufferfv(em_clear_mask_(ba), 0, init_color_);
+    } else if(ba > COLOR_BUFFER && ba < COLOR_BUFFER_MAX) {
+        glClearBufferfv(em_clear_mask_(ba),
+                ba - COLOR_BUFFER_0, init_color_);
     } else if(ba == DEPTH_BUFFER) {
-        glClearDepth(init_depth_);
         glDepthFunc(GL_LESS);
+        glClearBufferfv(em_clear_mask_(ba), 0, &init_depth_);
     }
-    glClear(em_clear_mask_(ba));
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 

@@ -44,6 +44,9 @@ public:
         COLOR_BUFFER,
         COLOR_BUFFER_0,
         COLOR_BUFFER_1,
+        COLOR_BUFFER_2,
+        COLOR_BUFFER_3,
+        COLOR_BUFFER_MAX,
         DEPTH_BUFFER,
     };
 

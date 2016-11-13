@@ -1,3 +1,5 @@
+(use-modules (shrtool))
+    
 (append
   (list attr-mesh prop-transfrm)
   '((name . "lambertian-texture")

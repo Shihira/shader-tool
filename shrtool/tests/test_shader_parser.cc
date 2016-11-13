@@ -111,7 +111,10 @@ TEST_CASE(test_parse_blinn_phong_sample) {
     assert_equal_print(si.sub_shaders[1].type, shader::VERTEX);
 }
 
+#include <libguile.h>
+
 int main(int argc, char* argv[])
 {
+    scm_init_guile();
     return unit_test::test_main(argc, argv);
 }

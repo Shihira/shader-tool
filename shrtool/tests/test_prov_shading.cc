@@ -181,8 +181,11 @@ TEST_CASE_FIXTURE(test_render_target, singlefunc_fixture) {
     image_io_netpbm::save_image(img_fs, out_img);
 }
 
+#include <libguile.h>
+
 int main(int argc, char* argv[])
 {
+    scm_init_guile();
     gui_test_context::init("330 core", "test_prov_shading");
     return unit_test::test_main(argc, argv);
 }

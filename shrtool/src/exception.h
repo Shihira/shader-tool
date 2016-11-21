@@ -25,6 +25,7 @@ DEFINE_TRIVIAL_ERROR(enum_map_error)
 DEFINE_TRIVIAL_ERROR(unsupported_error)
 DEFINE_TRIVIAL_ERROR(parse_error)
 DEFINE_TRIVIAL_ERROR(restriction_error)
+DEFINE_TRIVIAL_ERROR(resolve_error)
 
 }
 

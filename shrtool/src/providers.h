@@ -18,7 +18,11 @@
 namespace shrtool {
 
 template<typename InputType, typename OutputType>
-struct provider { };
+struct provider {
+    typedef std::unique_ptr<OutputType> output_type_ptr;
+
+    static void update(InputType& i, output_type_ptr& o, bool anew) { }
+};
 
 template<typename tag>
 struct attr_provider_updater { };

@@ -11,6 +11,7 @@ set(TESTS_REQUIRING_GL_CONTEXT
         test_shading
         test_prov_resources
         test_prov_shading
+        test_render_queue
     )
 
 set(TESTS_REQUIRING_GUILE

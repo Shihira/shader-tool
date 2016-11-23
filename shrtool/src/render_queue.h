@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "shading.h"
+#include "providers.h"
 
 namespace shrtool {
 
@@ -123,6 +124,10 @@ public:
             render_assets::texture& p);
 
     void render() const override;
+
+    template<typename ImportType>
+    void import(const ImportType& imp) {
+    }
 };
 
 }

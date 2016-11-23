@@ -111,6 +111,8 @@ public:
         return sub_shader_ptr();
     }
 
+    bool has_sub_shader(shader_type t) { return bool(share_sub_shader(t)); }
+
     // auto bind property with its name
     // and return the allocated binding index
     size_t property(const std::string& name,
@@ -173,6 +175,8 @@ public:
             return i->second;
         return buffer_ptr();
     }
+
+    bool has_input(size_t loc) { return bool(share_input(loc)); }
 
     void updated();
     void updated(size_t loc);

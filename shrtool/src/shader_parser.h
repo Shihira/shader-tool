@@ -7,6 +7,7 @@
 
 #include "shading.h" 
 #include "providers.h"
+#include "traits.h"
 
 namespace shrtool {
 
@@ -93,34 +94,14 @@ struct shader_parser {
 };
 
 template<>
-struct provider<shader_info, shader> {
+struct shader_trait<shader_info> {
     typedef shader_info input_type;
-    typedef shader output_type;
-    typedef std::unique_ptr<output_type> output_type_ptr;
 
-    static output_type_ptr load(input_type& i) {
-        output_type_ptr p(new output_type);
-        for(auto& ssi : i.sub_shaders) {
-            auto& ss = p->add_sub_shader(ssi.type);
-            ss.compile(ssi.make_source(i));
-        }
-        p->link();
-
-        return std::move(p);
-    }
-
-    static void update(input_type& i, output_type_ptr& o, bool anew) {
-        if(anew) {
-            for(auto& ssi : i.sub_shaders) {
-                auto ss = o->share_sub_shader(ssi.type);
-                if(!ss) {
-                    o->add_sub_shader(ssi.type);
-                    ss = o->share_sub_shader(ssi.type);
-                }
-                ss->compile(ssi.make_source(i));
-            }
-            o->link();
-        }
+    static std::string source(const input_type& i, size_t e,
+            shader::shader_type& t) {
+        if(e >= i.sub_shaders.size()) return "";
+        t = i.sub_shaders[e].type;
+        return i.sub_shaders[e].make_source(i);
     }
 };
 

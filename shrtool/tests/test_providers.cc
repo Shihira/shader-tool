@@ -63,14 +63,14 @@ TEST_CASE(test_attr_indirect_provider) {
     typedef provider<attr_data_1, vertex_attr_vector> prov;
 
     auto p = prov::load(d);
-    float* buf1 = p->share_input(0)->start_map<float>(buffer::READ);
-    float* buf2 = p->share_input(2)->start_map<float>(buffer::READ);
+    float* buf1 = p.share_input(0)->start_map<float>(buffer::READ);
+    float* buf2 = p.share_input(2)->start_map<float>(buffer::READ);
 
     assert_true(std::equal(d.some_data_1.begin(), d.some_data_1.end(), buf1));
     assert_true(std::equal(d.some_data_2.begin(), d.some_data_2.end(), buf2));
 
-    p->share_input(0)->stop_map();
-    p->share_input(2)->stop_map();
+    p.share_input(0)->stop_map();
+    p.share_input(2)->stop_map();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,7 +122,7 @@ TEST_CASE(test_attr_raw_data_provider) {
 
     auto p = prov::load(d);
     vector<uint32_t> read_data(d.some_data.size());
-    p->share_input(3)->read(read_data.data());
+    p.share_input(3)->read(read_data.data());
 
     assert_true(std::equal(d.some_data.begin(),
                 d.some_data.end(), read_data.begin()));
@@ -162,9 +162,9 @@ TEST_CASE(test_prop_indirect_provider) {
 
     auto p = prov::load(d);
 
-    uint32_t* buf = (uint32_t*) p->start_map(buffer::READ);
+    uint32_t* buf = (uint32_t*) p.start_map(buffer::READ);
     assert_true(std::equal(d.data.begin(), d.data.end(), buf));
-    p->stop_map();
+    p.stop_map();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -201,7 +201,7 @@ TEST_CASE(test_prop_raw_data_provider) {
     auto p = prov::load(d);
 
     vector<uint32_t> read_data(d.data.size());
-    p->read_raw(read_data.data());
+    p.read_raw(read_data.data());
     assert_true(std::equal(d.data.begin(), d.data.end(), read_data.data()));
 }
 

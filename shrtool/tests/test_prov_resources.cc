@@ -31,7 +31,7 @@ TEST_CASE(test_provided_mesh) {
     typedef provider<mesh_indexed, vertex_attr_vector> prov;
 
     auto p = prov::load(m);
-    float* buf = p->share_input(0)->start_map<float>(
+    float* buf = p.share_input(0)->start_map<float>(
             render_assets::buffer::READ);
 
     for(size_t i = 0; i < m.positions.size(); i++) {
@@ -39,7 +39,7 @@ TEST_CASE(test_provided_mesh) {
             assert_equal(buf[i * 4 + d], m.positions[i][d]);
     }
 
-    p->share_input(0)->stop_map();
+    p.share_input(0)->stop_map();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +72,7 @@ TEST_CASE(test_provided_universal_property) {
 
     typedef provider<up_t, property_buffer> prov;
     auto p = prov::load(up);
-    void* buf = p->start_map(buffer::READ);
+    void* buf = p.start_map(buffer::READ);
 
     assert_equal_print(static_cast<float*>(buf)[0], 12);
     assert_equal_print(static_cast<float*>(buf)[7], 90); // NOTE: col-major
@@ -83,7 +83,7 @@ TEST_CASE(test_provided_universal_property) {
     assert_equal_print(static_cast<double*>(buf)[13], 11);
     assert_float_equal(static_cast<double*>(buf)[15], 3.14159);
 
-    p->stop_map();
+    p.stop_map();
 }
 
 int main(int argc, char* argv[])

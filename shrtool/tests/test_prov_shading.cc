@@ -52,9 +52,9 @@ TEST_CASE_FIXTURE(test_sphere, singlefunc_fixture)
     auto pill = provider<decltype(ill_data), property_buffer>::load(ill_data);
     auto pmat = provider<decltype(mat_data), property_buffer>::load(mat_data);
 
-    s->property("transfrm", *pmvp);
-    s->property("illum", *pill);
-    s->property("material", *pmat);
+    s.property("transfrm", pmvp);
+    s.property("illum", pill);
+    s.property("material", pmat);
 
     update = [&]() {
         model_mat *= tf::rotate<float>(M_PI / 120, tf::zOx);
@@ -70,7 +70,7 @@ TEST_CASE_FIXTURE(test_sphere, singlefunc_fixture)
         render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
         render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
 
-        s->draw(*a);
+        s.draw(a);
     };
 
     main_loop();
@@ -109,10 +109,10 @@ TEST_CASE_FIXTURE(test_earth, singlefunc_fixture)
     auto pill = provider<decltype(ill_data), property_buffer>::load(ill_data);
     auto pmat = provider<decltype(mat_data), property_buffer>::load(mat_data);
 
-    s->property("transfrm", *pmvp);
-    s->property("illum", *pill);
-    s->property("material", *pmat);
-    s->property("texMap", *tex);
+    s.property("transfrm", pmvp);
+    s.property("illum", pill);
+    s.property("material", pmat);
+    s.property("texMap", tex);
 
     update = [&]() {
         model_mat *= tf::rotate<float>(M_PI / 480, tf::zOx);
@@ -128,7 +128,7 @@ TEST_CASE_FIXTURE(test_earth, singlefunc_fixture)
         render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
         render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
 
-        s->draw(*a);
+        s.draw(a);
     };
 
     main_loop();
@@ -169,12 +169,12 @@ TEST_CASE_FIXTURE(test_render_target, singlefunc_fixture) {
     auto pmvp = provider<decltype(mvp_data), property_buffer>::load(mvp_data);
     auto pmat = provider<decltype(mat_data), property_buffer>::load(mat_data);
 
-    s->target(fb);
-    s->property("transfrm", *pmvp);
-    s->property("material", *pmat);
+    s.target(fb);
+    s.property("transfrm", pmvp);
+    s.property("material", pmat);
     fb.clear_buffer(render_target::COLOR_BUFFER);
     fb.clear_buffer(render_target::DEPTH_BUFFER);
-    s->draw(*a);
+    s.draw(a);
 
     fb_tex.read(out_img.data(), texture::RGBA_U8888);
     out_img.flip_v(); // images got from GL are upside-down

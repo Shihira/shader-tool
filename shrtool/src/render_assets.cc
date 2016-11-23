@@ -67,6 +67,9 @@ __DEF_GEN_DEL_CONSTRUCT_OBJECT(buffer, glGenBuffers, glDeleteBuffers)
 ////////////////////////////////////////////////////////////////////////////////
 
 void texture2d::fill(const void* data, format fmt) {
+    if(!width() || !height())
+        throw restriction_error("Size of textures cannot be zero");
+
     glBindTexture(GL_TEXTURE_2D, id());
     format ifmt = internal_format() == DEFAULT_FMT ? fmt : internal_format();
     glTexImage2D(
@@ -84,6 +87,24 @@ void texture2d::fill(const void* data, format fmt) {
     glGenerateMipmap(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, GL_NONE);
     filled_ = true;
+}
+
+void texture::internal_format(format f) {
+    if(!vacuum() && format_ != f)
+        throw restriction_error("Texture format cannot be changed.");
+    format_ = f;
+}
+
+void texture2d::width(size_t w) {
+    if(!vacuum() && w_ != w)
+        throw restriction_error("Texture size cannot be changed.");
+    w_ = w;
+}
+
+void texture2d::height(size_t h) {
+    if(!vacuum() && h_ != h)
+        throw restriction_error("Texture size cannot be changed.");
+    h_ = h;
 }
 
 void texture2d::read(void* data, format fmt) {
@@ -120,8 +141,8 @@ void texture_cubemap2d::bind_to(size_t tex_bind) const {
 }
 
 void buffer::size(size_t sz) {
-    if(size_ != 0 && size_ != sz)
-        throw restriction_error("Buffer size cannot be change a second time");
+    if(!vacuum() && size_ != sz)
+        throw restriction_error("Buffer size cannot be changed");
     size_ = sz;
 }
 
@@ -159,7 +180,7 @@ void property_buffer::read_raw(void* data, size_t sz) {
 
 void vertex_attr_buffer::read_raw(void* data, size_t sz) {
     if(sz > size())
-        throw restriction_error("Size to read too large");
+        throw restriction_error("Size to read is too large");
     if(!sz) sz = size();
 
     glBindBuffer(GL_ARRAY_BUFFER, id());

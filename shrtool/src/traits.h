@@ -161,6 +161,14 @@ struct texture2d_trait {
     //}
 };
 
+template<typename InputType, typename Enable = void>
+struct shader_trait {
+    //typedef InputType input_type;
+
+    //static std::string source(const input_type& i, size_t e,
+    //      shader::shader_type& t);
+};
+
 }
 
 #endif // RES_TRAIT_INCLUDED

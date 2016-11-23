@@ -19,14 +19,18 @@ typedef uint32_t id_type;
 template<typename Derived>
 class lazy_id_object_ {
 public:
+    bool vacuum() const { return id_ == 0; }
+
+    void destroy() { 
+        if(id_) reinterpret_cast<const Derived*>(this)->destroy_object(id_);
+    }
+
     id_type id() const {
         if(!id_) id_ = reinterpret_cast<const Derived*>(this)->create_object();
         return id_;
     }
 
-    ~lazy_id_object_() {
-        if(id_) reinterpret_cast<const Derived*>(this)->destroy_object(id_);
-    };
+    ~lazy_id_object_() { destroy(); };
 
     lazy_id_object_() { }
     lazy_id_object_(const lazy_id_object_& l) = delete;
@@ -76,7 +80,7 @@ public:
     unsigned level() const { return level_; }
     void level(unsigned l) { level_ = l; }
     format internal_format() const { return format_; }
-    void internal_format(format f) { format_ = f; }
+    void internal_format(format f);
     filter_type filter() const { return _filter; }
     void filter(filter_type f) { _filter = f; }
 
@@ -89,7 +93,7 @@ class texture2d : public texture {
     bool filled_ = false;
 
 public:
-    texture2d(size_t width, size_t height, format ifmt = DEFAULT_FMT) :
+    texture2d(size_t width = 0, size_t height = 0, format ifmt = DEFAULT_FMT) :
         w_(width), h_(height) {
         internal_format(ifmt);
     }
@@ -98,9 +102,9 @@ public:
     void read(void* data, format fmt);
 
     size_t width() const { return w_; }
-    void width(size_t w) { w_ = w; }
     size_t height() const { return h_; }
-    void height(size_t h) { h_ = h; }
+    void width(size_t w);
+    void height(size_t h);
 
     // there is a texture limitation for each render pass in graphical dirvers
     // this is for binding textures to a number for the current render pass
@@ -118,7 +122,7 @@ public:
         LEFT, RIGHT,
     };
 
-    texture_cubemap2d(size_t edge_len, format ifmt = DEFAULT_FMT) :
+    texture_cubemap2d(size_t edge_len = 0, format ifmt = DEFAULT_FMT) :
         edge_len_(edge_len) {
         internal_format(ifmt);
     }

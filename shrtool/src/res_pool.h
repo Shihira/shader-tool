@@ -1,0 +1,191 @@
+#ifndef RES_POOL_H_INCLUDED
+#define RES_POOL_H_INCLUDED
+
+/*
+ * res_pool and ires_pool are dynamic typed storage. you can tag your objects
+ * with a string or int, or any thing else that can be a map index.
+ */
+
+#include <string>
+#include <memory>
+#include <unordered_map>
+#include <typeinfo>
+
+#include "exception.h"
+
+namespace shrtool {
+
+struct res_storage_base {
+    virtual std::string type_name() const = 0;
+    virtual ~res_storage_base() { };
+
+    template<typename T>
+    bool type_hint(const T&) const {
+        return typeid(T).name() == type_name();
+    }
+
+    template<typename T>
+    bool type_hint() const {
+        return typeid(T).name() == type_name();
+    }
+
+    template<typename T>
+    bool assert_type(const T&) const {
+        if(!type_hint<T>())
+            throw type_matching_error("Type mismatch: " +
+                    type_name() + " is required but got " +
+                    typeid(T).name());
+    }
+
+    template<typename T>
+    void assert_type() const {
+        if(!type_hint<T>())
+            throw type_matching_error("Type mismatch: " +
+                    type_name() + " is required but got " +
+                    typeid(T).name());
+    }
+};
+
+template<bool AllowChangeName, typename NameT>
+struct name_helper {
+    typedef NameT name_type;
+    name_type name;
+    name_helper(name_type n) : name(std::move(n)) { }
+};
+
+template<typename NameT>
+struct name_helper<false, NameT> {
+    typedef NameT name_type;
+    const name_type name;
+    name_helper(name_type n) : name(std::move(n)) { }
+};
+
+template<typename T, bool AllowChangeName, typename NameT>
+struct basic_named_object :
+    name_helper<AllowChangeName, NameT>,
+    res_storage_base {
+private:
+    typedef name_helper<AllowChangeName, NameT> nh_type;
+public:
+    typedef NameT name_type;
+    typedef T value_type;
+
+    T data;
+
+    template<typename ...Args>
+    basic_named_object(name_type s, Args ...args) :
+        nh_type(std::move(s)), data(std::forward<Args>(args)...) { }
+
+    basic_named_object(basic_named_object&& obj) :
+        nh_type(std::move(obj.name_type)), data(std::move(obj)) { }
+
+    operator value_type&() { return data; }
+    operator const value_type&() const { return data; }
+    operator value_type*() { return &data; }
+    operator const value_type*() const { return &data; }
+
+    value_type* operator*() { return &data; }
+    const value_type* operator*() const { return &data; }
+    value_type* operator->() { return &data; }
+    const value_type* operator->() const { return &data; }
+
+    ~basic_named_object() { }
+    std::string type_name() const override {
+        return typeid(T).name();
+    }
+};
+
+template<typename NameT, typename T>
+using fixed_name_pair = basic_named_object<T, false, NameT>;
+template<typename T>
+using fixed_str_obj = fixed_name_pair<std::string, T>;
+
+template<typename NameT>
+class basic_res_pool {
+public:
+    typedef NameT name_type;
+
+    template<typename T>
+    using stor_type = fixed_name_pair<name_type, T>;
+
+private:
+    std::unordered_map<name_type,
+        std::shared_ptr<res_storage_base>> data_;
+    bool type_hint_ = false;
+
+public:
+    void type_hint_enabled(bool b) { type_hint_ = b; }
+    bool type_hint_enabled() const { return type_hint_; }
+
+    template<typename T, typename ...Args>
+    void insert(name_type name, Args ...args) {
+        auto& p = data_[name];
+        p.reset(new stor_type<T>(std::move(name),
+                    std::forward<Args>(args)...));
+    }
+
+    template<typename T>
+    void insert(name_type name, T&& arg) {
+        auto& p = data_[name];
+        p.reset(new stor_type<T>(std::move(name), std::move(arg)));
+    }
+
+    template<typename T>
+    void insert(name_type name, const T& arg) {
+        auto& p = data_[name];
+        p.reset(new stor_type<T>(std::move(name), arg));
+    }
+
+    template<typename T>
+    void insert_shared(name_type name,
+            const std::shared_ptr<stor_type<T>>& p_) {
+        auto& p = data_[name];
+        p = std::static_pointer_cast<res_storage_base>(p_);
+    }
+
+    void remove(const name_type& name) {
+        auto i = data_.find(name);
+        if(i != data_.end()) data_.erase(i);
+    }
+
+    template<typename T>
+    std::weak_ptr<fixed_name_pair<NameT, T>>
+    ref(const name_type& n) const {
+        auto p = data_.find(n);
+        if(p == data_.end() || !bool(p->second))
+            return std::weak_ptr<stor_type<T>>();
+        else {
+            if(type_hint_enabled())
+                p->second->template assert_type<T>();
+            return std::dynamic_pointer_cast<stor_type<T>>(p->second);
+        }
+    }
+
+    template<typename T>
+    std::weak_ptr<const fixed_name_pair<NameT, T>>
+    const_ref(const name_type& n) const {
+        auto p = data_.find(n);
+        if(p == data_.end() || !bool(p->second))
+            return std::weak_ptr<stor_type<T>>();
+        else {
+            if(type_hint_enabled())
+                p->second->template assert_type<T>();
+            return std::dynamic_pointer_cast<const stor_type<T>>(p->second);
+        }
+    }
+
+    template<typename T>
+    T& get(const name_type& n) const {
+        auto r = ref<T>(n);
+        if(r.expired())
+            throw not_found_error("No item is available");
+        return r.lock()->data;
+    }
+};
+
+typedef basic_res_pool<std::string> res_pool;
+typedef basic_res_pool<size_t> ires_pool;
+
+}
+
+#endif // RES_POOL_H_INCLUDED

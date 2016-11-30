@@ -276,6 +276,13 @@ inline int test_main(int argc, char* argv[]) {
     } \
 }
 
+#define assert_no_except(expr) { \
+    try { expr; } \
+    catch(...)  { \
+        throw assert_error("Exception catched"); \
+    } \
+}
+
 #define assert_float_equal(expr1, expr2) \
     assert_float_close(expr1, expr2, 0.00001)
 

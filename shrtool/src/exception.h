@@ -26,6 +26,8 @@ DEFINE_TRIVIAL_ERROR(unsupported_error)
 DEFINE_TRIVIAL_ERROR(parse_error)
 DEFINE_TRIVIAL_ERROR(restriction_error)
 DEFINE_TRIVIAL_ERROR(resolve_error)
+DEFINE_TRIVIAL_ERROR(type_matching_error)
+DEFINE_TRIVIAL_ERROR(not_found_error)
 
 }
 

@@ -17,6 +17,7 @@ set(TESTS_REQUIRING_GL_CONTEXT
 set(TESTS_REQUIRING_GUILE
         test_shader_parser
         test_prov_shading
+        test_scm
     )
 
 file(GLOB_RECURSE ALL_UNIT_TESTS tests/test_*.cc)

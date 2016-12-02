@@ -107,33 +107,43 @@ public:
 
     template<typename T>
     using stor_type = fixed_name_pair<name_type, T>;
+    template<typename T>
+    using stor_ref = std::weak_ptr<stor_type<T>>;
+    template<typename T>
+    using stor_const_ref = std::weak_ptr<const stor_type<T>>;
 
 private:
     std::unordered_map<name_type,
         std::shared_ptr<res_storage_base>> data_;
     bool type_hint_ = false;
+    bool redef_ = false;
 
 public:
     void type_hint_enabled(bool b) { type_hint_ = b; }
     bool type_hint_enabled() const { return type_hint_; }
+    void redefinition_allowed(bool b) { redef_ = b; }
+    bool redefinition_allowed() const { return redef_; }
 
     template<typename T, typename ...Args>
-    void insert(name_type name, Args ...args) {
+    stor_ref<T> insert(name_type name, Args ...args) {
         auto& p = data_[name];
         p.reset(new stor_type<T>(std::move(name),
                     std::forward<Args>(args)...));
+        return std::dynamic_pointer_cast<stor_type<T>>(p);
     }
 
     template<typename T>
-    void insert(name_type name, T&& arg) {
+    stor_ref<T> insert(name_type name, T&& arg) {
         auto& p = data_[name];
         p.reset(new stor_type<T>(std::move(name), std::move(arg)));
+        return std::dynamic_pointer_cast<stor_type<T>>(p);
     }
 
     template<typename T>
-    void insert(name_type name, const T& arg) {
+    stor_ref<T> insert(name_type name, const T& arg) {
         auto& p = data_[name];
         p.reset(new stor_type<T>(std::move(name), arg));
+        return std::dynamic_pointer_cast<stor_type<T>>(p);
     }
 
     template<typename T>
@@ -149,8 +159,7 @@ public:
     }
 
     template<typename T>
-    std::weak_ptr<fixed_name_pair<NameT, T>>
-    ref(const name_type& n) const {
+    stor_ref<T> ref(const name_type& n) const {
         auto p = data_.find(n);
         if(p == data_.end() || !bool(p->second))
             return std::weak_ptr<stor_type<T>>();
@@ -162,8 +171,7 @@ public:
     }
 
     template<typename T>
-    std::weak_ptr<const fixed_name_pair<NameT, T>>
-    const_ref(const name_type& n) const {
+    stor_const_ref<T> const_ref(const name_type& n) const {
         auto p = data_.find(n);
         if(p == data_.end() || !bool(p->second))
             return std::weak_ptr<stor_type<T>>();
@@ -180,6 +188,12 @@ public:
         if(r.expired())
             throw not_found_error("No item is available");
         return r.lock()->data;
+    }
+
+    std::string type_name(const std::string& n) const {
+        auto i = data_.find(n);
+        if(i != data_.end()) return i->second->type_name();
+        else return "";
     }
 };
 

@@ -32,7 +32,8 @@ public:
         test_case_func(fn), name(nm) { }
 
     test_case(test_case&& tc) :
-        test_case_func(std::move(tc.test_case_func)), name(std::move(tc.name)) { }
+        test_case_func(std::move(tc.test_case_func)),
+        name(std::move(tc.name)) { }
 
     test_case(const test_case& tc) :
         test_case_func(tc.test_case_func), name(tc.name) { }

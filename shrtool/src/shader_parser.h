@@ -31,15 +31,12 @@ public:
 
     typedef std::pair<item_type, std::string> type_name_pair;
 
-private:
-    std::vector<type_name_pair> lo_;
-
 public:
-    const std::vector<type_name_pair>& value = lo_;
+    std::vector<type_name_pair> value;
 
     layout() { }
-    layout(const layout& l) : lo_(l.lo_) { }
-    layout(layout&& l) : lo_(std::move(l.lo_)) { }
+    layout(const layout& l) : value(l.value) { }
+    layout(layout&& l) : value(std::move(l.value)) { }
 
     static std::string glsl_type_name(item_type t);
 
@@ -77,6 +74,9 @@ struct shader_info {
     shader_info() = default;
     shader_info(const shader_info&) = default;
     shader_info(shader_info&&) = default;
+
+    const sub_shader_info* get_sub_shader_by_type(shader::shader_type t) const;
+    sub_shader_info* get_sub_shader_by_type(shader::shader_type t);
 };
 
 struct shader_parser {

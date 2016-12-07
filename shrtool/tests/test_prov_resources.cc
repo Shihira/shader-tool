@@ -86,6 +86,40 @@ TEST_CASE(test_provided_universal_property) {
     p.stop_map();
 }
 
+TEST_CASE(test_provided_dynamic_property) {
+    dynamic_property dp;
+
+    dp.get<math::matrix<float, 4, 3>>(0) = math::matrix<float, 4, 3> {
+        12, 64, 23,
+        45, 31, 63,
+        75, 29, 73,
+        3,  90, 15,
+    };
+    dp.get<math::fcol3>(1) = math::fcol3{ 1.1, 2, 3.3 };
+    dp.get<int>(2) = 4;
+    dp.get<math::fcol3>(3) = math::fcol3{ 5.5, 6.6, 7 };
+    dp.get<char>(4) = 'S';
+    dp.get<char>(5) = 'H';
+    dp.get<char>(6) = 'R';
+    dp.get<math::col3>(7) = math::col3{ 10, 11, 12 };
+    dp.get<double>(8) = 3.14159;
+
+    typedef provider<dynamic_property, property_buffer> prov;
+    auto p = prov::load(dp);
+    void* buf = p.start_map(buffer::READ);
+
+    assert_equal_print(static_cast<float*>(buf)[0], 12);
+    assert_equal_print(static_cast<float*>(buf)[7], 90); // NOTE: col-major
+    assert_float_equal(static_cast<float*>(buf)[12], 1.1);
+    assert_equal_print(static_cast<int*>(buf)[15], 4);
+    assert_equal_print(static_cast<char*>(buf)[77], 'H');
+    assert_equal_print(static_cast<char*>(buf)[78], 'R');
+    assert_equal_print(static_cast<double*>(buf)[13], 11);
+    assert_float_equal(static_cast<double*>(buf)[15], 3.14159);
+
+    p.stop_map();
+}
+
 int main(int argc, char* argv[])
 {
     gui_test_context::init("330 core", "");

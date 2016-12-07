@@ -195,6 +195,15 @@ public:
         if(i != data_.end()) return i->second->type_name();
         else return "";
     }
+
+    basic_res_pool& operator=(basic_res_pool&& p) {
+        data_ = std::move(p.data_);
+        type_hint_ = p.type_hint_;
+        redef_ = p.redef_;
+    }
+
+    basic_res_pool() { }
+    basic_res_pool(basic_res_pool&& p) { operator=(std::move(p)); }
 };
 
 typedef basic_res_pool<std::string> res_pool;

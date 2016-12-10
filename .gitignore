@@ -1,5 +1,6 @@
-build
-!build/set_env.sh
+build/*
+!/build/set_env.sh
+!/build/test_all.sh
 assets/textures
 
 .ycm_extra_conf.py

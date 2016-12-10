@@ -49,7 +49,7 @@ SCM make_smob_from_weak_ref(std::weak_ptr<T> w)
         sizeof(data_stor) > sizeof(std::weak_ptr<T>),
         "unable to store a weak_ptr in Smob");
 
-    auto* p = new (data_stor) std::weak_ptr<T>(std::move(w));
+    new (data_stor) std::weak_ptr<T>(std::move(w));
 
     SCM o = scm_new_double_smob(shader_type,
             data_stor[0], data_stor[1], data_stor[2]);

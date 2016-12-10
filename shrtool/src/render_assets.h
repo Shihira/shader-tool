@@ -19,7 +19,7 @@ typedef uint32_t id_type;
 template<typename Derived>
 class lazy_id_object_ {
 public:
-    bool vacuum() const { return id_ == 0; }
+    virtual bool vacuum() const { return id_ == 0; }
 
     void destroy() { 
         if(id_) reinterpret_cast<const Derived*>(this)->destroy_object(id_);
@@ -192,6 +192,8 @@ public:
 
     virtual void* start_map(buffer_access bt, size_t sz = 0) = 0;
     virtual void stop_map() = 0;
+
+    bool vacuum() const override { return size_ == 0; }
 
     template<typename T>
     void write(const T* data, size_t sz = 0) {

@@ -108,7 +108,7 @@ public:
         prop_buf_ref_changed = true;
     }
 
-    void set_render_target(render_target& t) { target_ = &t; }
+    void set_target(render_target& t) { target_ = &t; }
     void set_attributes(vertex_attr_vector& v) { attr_ = &v; }
     void reset() {
         shr_ = nullptr;
@@ -124,9 +124,123 @@ public:
             render_assets::texture& p);
 
     void render() const override;
+};
 
-    template<typename ImportType>
-    void import(const ImportType& imp) {
+////////////////////////////////////////////////////////////////////////////////
+// predesigned solution
+
+/*
+ * Lazy update: Generally a GPU object is update whenever the source object is
+ * modified. But when the source object is modified serveral times, it would act
+ * in a very low performance. For example, a property object has serveral items
+ * to be set separately, but when you set an item, I cannot tell whether you are
+ * going to set other items. Based on this consideration, GPU updates are done
+ * right before rendering and no where else.
+ */
+
+class provided_render_task : public shader_render_task {
+public:
+    struct provider_bindings {
+        std::map<size_t, shader> shader_bindings;
+        std::map<size_t, render_target> target_bindings;
+        std::map<size_t, vertex_attr_vector> attr_bindings;
+        std::map<size_t, render_assets::texture2d> texture2d_bindings;
+        std::map<size_t, render_assets::property_buffer> property_bindings;
+
+        template<typename Prov, typename T, typename Bindings>
+        static typename Prov::output_type& set_binding(
+                const T& obj, Bindings& b) {
+            size_t hashcode = reinterpret_cast<size_t>(&obj);
+            auto res = b.find(hashcode);
+            if(res == b.end()) {
+                Prov::update(obj, b[hashcode], true);
+                res = b.find(hashcode);
+            }
+
+            return res->second;
+        }
+    };
+
+private:
+    provider_bindings& pb_;
+
+    std::function<void()> shader_updater;
+    std::function<void()> target_updater;
+    std::function<void()> attr_updater;
+    std::map<std::string, std::function<void()>> prop_updater;
+
+public:
+    provided_render_task(provider_bindings& pb) : pb_(pb) { }
+
+    template<typename T, typename Enabled = typename std::enable_if<
+        !std::is_same<T, shader>::value>::type>
+    void set_shader(T& obj) {
+        shader& r = provider_bindings::set_binding<provider<T, shader>>(
+                obj, pb_.shader_bindings);
+        shader_updater = [&obj, &r]() {
+            provider<T, shader>::update(obj, r, false);
+        };
+    }
+
+    using shader_render_task::set_target;
+    template<typename T>
+    void set_target(T& obj) {
+        render_target& r = provider_bindings::set_binding
+            <provider<T, render_target>>(obj, pb_.target_bindings);
+        set_target(r);
+        target_updater = [&obj, &r]() {
+            provider<T, render_target>::update(obj, r, false);
+        };
+    }
+
+    using shader_render_task::set_attributes;
+    template<typename T>
+    void set_attributes(T& obj) {
+        vertex_attr_vector& r = provider_bindings::set_binding
+            <provider<T, vertex_attr_vector>>(obj, pb_.attr_bindings);
+        set_attributes(r);
+        attr_updater = [&obj, &r]() {
+            provider<T, vertex_attr_vector>::update(obj, r, false);
+        };
+    }
+
+    using shader_render_task::set_property;
+    template<typename T>
+    void set_property(const std::string& name, T& obj) {
+        render_assets::property_buffer& r = provider_bindings::set_binding
+            <provider<T, render_assets::property_buffer>>(obj, pb_.property_bindings);
+        set_property(name, r);
+        prop_updater[name] = [&obj, &r]() {
+            provider<T, render_assets::property_buffer>::update(obj, r, false);
+        };
+    }
+
+    template<typename T>
+    void set_tex2d_property(const std::string& name, T& obj) {
+        render_assets::texture2d& r = provider_bindings::set_binding
+            <provider<T, render_assets::texture2d>>(obj, pb_.texture2d_bindings);
+        set_property(name, r);
+        prop_updater[name] = [&obj, &r]() {
+            provider<T, render_assets::texture2d>::update(obj, r, false);
+        };
+    }
+
+    void set_tex2d_property(const std::string& name, render_assets::texture2d& tex) {
+        shader_render_task::set_property(name, tex);
+    }
+
+    void update() const {
+        shader_updater();
+        target_updater();
+        attr_updater();
+
+        for(auto& pu : prop_updater)
+            pu.second();
+    }
+
+    void render() const override {
+        update();
+        shader_render_task::render();
     }
 };
 

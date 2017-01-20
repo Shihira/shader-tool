@@ -205,6 +205,86 @@ TEST_CASE(test_prop_raw_data_provider) {
     assert_true(std::equal(d.data.begin(), d.data.end(), read_data.data()));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+struct prop_data_3 {
+    friend class shrtool::prop_trait<prop_data_3>;
+
+private:
+    int data;
+    bool changed;
+
+public:
+    void set(int d) { data = d; changed = true; }
+    int get() const { return data; }
+
+    mutable bool is_copied;
+};
+
+namespace shrtool {
+
+template<>
+struct prop_trait<prop_data_3> {
+    typedef prop_data_3 input_type;
+    typedef indirect_tag transfer_tag;
+    typedef int value_type;
+
+    static size_t size(const input_type& i) {
+        return sizeof(int);
+    }
+
+    static void copy(const input_type& i, int* o) {
+        i.is_copied = true;
+        *o = i.data;
+    }
+
+    static bool is_changed(const input_type& i) { return i.changed; }
+    static void mark_applied(input_type& i) { i.changed = false; }
+};
+
+}
+
+TEST_CASE(test_prop_update) {
+    prop_data_3 d;
+    d.set(13);
+
+    typedef provider<prop_data_3, property_buffer> prov;
+
+    int read_data;
+
+    d.is_copied = false;
+    auto p = prov::load(d);
+    p.read(&read_data, 1);
+    assert_equal_print(d.is_copied, true);
+    assert_equal_print(read_data, 13);
+
+    d.set(23);
+    d.is_copied = false;
+    prov::update(d, p, false);
+    p.read(&read_data, 1);
+    assert_equal_print(d.is_copied, true);
+    assert_equal_print(read_data, 23);
+
+    d.is_copied = false;
+    prov::update(d, p, false);
+    p.read(&read_data, 1);
+    assert_equal_print(d.is_copied, false);
+    assert_equal_print(read_data, 23);
+
+    d.is_copied = false;
+    prov::update(d, p, false);
+    p.read(&read_data, 1);
+    assert_equal_print(d.is_copied, false);
+    assert_equal_print(read_data, 23);
+
+    d.set(50);
+    d.is_copied = false;
+    prov::update(d, p, false);
+    p.read(&read_data, 1);
+    assert_equal_print(d.is_copied, true);
+    assert_equal_print(read_data, 50);
+}
+
 int main(int argc, char* argv[])
 {
     gui_test_context::init("330 core", "");

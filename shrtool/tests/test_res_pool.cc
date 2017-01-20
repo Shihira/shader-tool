@@ -34,6 +34,10 @@ TEST_CASE(test_store_data) {
     assert_equal_print(r4.lock()->data[3], 6);
     assert_equal_print(rp.get<std::vector<int>>("damn-vec")[3], 6);
 
+    auto r5 = rp.ref("holy-int");
+    assert_equal_print(r5.lock()->name, "holy-int");
+    assert_equal_print(r5.lock()->type_name(), typeid(int).name());
+
     rp.remove("holy-int");
     assert_true(r1.expired());
     rp.remove("shit_string");

@@ -97,6 +97,15 @@
                    0 0 0 1 ':))
         (else (error "mat-rotate-4" "not supported axis"))))))
 
+(define mat-perspective-4
+  (lambda (fovy aspect znear zfar)
+    (let ((f (/ 1 (tan (/ fovy 2))))
+          (zdiff (- znear zfar)))
+      (make-mat (/ f aspect) 0 0 0 ':
+                0 f 0 0 ':
+                0 0 (/ (+ zfar znear) zdiff) (/ (* 2 znear zfar) zdiff) ':
+                0 0 -1 0 ':))))
+
 (define mat+
   (lambda (A B)
     (let ((M (mat-zeros-like A)))
@@ -182,7 +191,7 @@
          (mat-ref A (+ r (car reg-rngr)) (+ c (car reg-rngc)))))
      M)))
 
-(define mat*
+(define mat*2
   (lambda (A B)
     (if (number? B)
       (let ((M (mat-zeros-like A)))
@@ -200,6 +209,13 @@
             (array-index-map! M
               (lambda (r c) (iter r c 0 0)))
             M)))))
+
+(define mat*
+  (lambda (. l)
+   (cond
+    ((not (pair? l)) #f)
+    ((not (pair? (cdr l))) (car l))
+    (else (apply mat* (cons (mat*2 (car l) (cadr l)) (cddr l)))))))
 
 (define mat/
   (lambda (A a)

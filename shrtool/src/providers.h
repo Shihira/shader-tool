@@ -32,7 +32,7 @@
 namespace shrtool {
 
 #define DEF_LOAD_FUNC \
-    static output_type load(const input_type& i) { \
+    static output_type load(input_type& i) { \
         output_type new_; \
         update(i, new_, true); \
         return new_; \
@@ -40,13 +40,17 @@ namespace shrtool {
 
 template<typename InputType, typename OutputType>
 struct provider {
+    /*
     typedef OutputType output_type;
     typedef InputType input_type;
 
     DEF_LOAD_FUNC
 
     static void update(const InputType& i, OutputType& o, bool anew) { }
+    */
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 template<typename tag>
 struct attr_provider_updater { };
@@ -120,6 +124,27 @@ struct provider<InputType, vertex_attr_vector>{
 
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename T, typename Trait = prop_trait<T>,
+    typename Func = decltype(&Trait::is_changed)>
+bool optional_is_changed(const T& i, int) { return Trait::is_changed(i); }
+template<typename T, typename Trait = prop_trait<T>,
+    typename Func = void, typename Int = int>
+bool optional_is_changed(const T& i, Int) { return false; }
+
+template<typename T, typename Trait = prop_trait<T>,
+    typename Func = decltype(&Trait::is_changed)>
+void optional_mark_applied(T& i, int) { Trait::mark_applied(i); }
+template<typename T, typename Trait = prop_trait<T>,
+    typename Func = void, typename Int = int>
+void optional_mark_applied(T& i, Int) { }
+
+template<typename T, typename T2 = int>
+constexpr void* optional_value_type(T2) { return nullptr; }
+template<typename T>
+constexpr typename T::value_type* optional_value_type(int) { return nullptr; }
+
 template<typename tag>
 struct prop_provider_updater { };
 
@@ -129,18 +154,13 @@ struct prop_provider_updater<raw_data_tag> {
 
     template<typename input_type,
         typename Trait = prop_trait<input_type>>
-    static void update(const input_type& i, output_type& o, bool anew) {
-        if(anew) {
-            o.write(Trait::data(i), Trait::size(i));
-        }
+    static void update(input_type& i, output_type& o, bool anew) {
+        if(!anew && !optional_is_changed(i, 0)) return;
+
+        o.write(Trait::data(i), Trait::size(i));
+        optional_mark_applied(i, 0);
     }
 };
-
-// prop_data_type provides a correct pointer type
-template<typename T, typename T2 = int>
-constexpr void* prop_data_type_(T2) { return nullptr; }
-template<typename T>
-constexpr typename T::value_type* prop_data_type_(int) { return nullptr; }
 
 template<>
 struct prop_provider_updater<indirect_tag> {
@@ -148,14 +168,15 @@ struct prop_provider_updater<indirect_tag> {
 
     template<typename input_type,
         typename Trait = prop_trait<input_type>>
-    static void update(const input_type& i, output_type& o, bool anew) {
-        if(anew) {
-            void* p = o.start_map(render_assets::buffer::WRITE,
-                    Trait::size(i));
-            Trait::copy(i, reinterpret_cast<
-                    decltype(prop_data_type_<Trait>(0))>(p));
-            o.stop_map();
-        }
+    static void update(input_type& i, output_type& o, bool anew) {
+        if(!anew && !optional_is_changed(i, 0)) return;
+
+        void* p = o.start_map(render_assets::buffer::WRITE,
+                Trait::size(i));
+        Trait::copy(i, reinterpret_cast<
+                decltype(optional_value_type<Trait>(0))>(p));
+        o.stop_map();
+        optional_mark_applied(i, 0);
     }
 };
 
@@ -167,11 +188,13 @@ struct provider<InputType, render_assets::property_buffer> {
     DEF_LOAD_FUNC
 
     template<typename Trait = prop_trait<input_type>>
-    static void update(const input_type& i, output_type& o, bool anew) {
+    static void update(input_type& i, output_type& o, bool anew) {
         prop_provider_updater<typename Trait::transfer_tag>
             ::update(i, o, anew);
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 template<typename InputType>
 struct provider<InputType, render_assets::texture2d> {
@@ -181,7 +204,7 @@ struct provider<InputType, render_assets::texture2d> {
     DEF_LOAD_FUNC
 
     template<typename Trait = texture2d_trait<input_type>>
-    static void update(const input_type& i, output_type& p, bool anew) {
+    static void update(input_type& i, output_type& p, bool anew) {
         if(anew) {
             p.width(Trait::width(i));
             p.height(Trait::height(i));
@@ -189,6 +212,8 @@ struct provider<InputType, render_assets::texture2d> {
         }
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 template<typename InputType>
 struct provider<InputType, shader> {

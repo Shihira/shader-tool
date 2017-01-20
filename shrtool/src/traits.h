@@ -128,6 +128,8 @@ struct prop_trait {
     //typedef float value_type;
 
     // static size_t size(const input_type& i);
+    // static bool is_changed(const input_type& i);
+    // static void mark_applied(input_type& i);
     /*
      * For raw_data
      */

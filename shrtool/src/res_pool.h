@@ -60,24 +60,31 @@ struct name_helper<false, NameT> {
     name_helper(name_type n) : name(std::move(n)) { }
 };
 
-template<typename T, bool AllowChangeName, typename NameT>
-struct basic_named_object :
+template<bool AllowChangeName, typename NameT>
+struct base_named_object :
     name_helper<AllowChangeName, NameT>,
     res_storage_base {
+    using name_helper<AllowChangeName, NameT>::name_helper;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename T, typename BaseT>
+struct basic_res_object : BaseT {
 private:
-    typedef name_helper<AllowChangeName, NameT> nh_type;
+    typedef BaseT base_type;
 public:
-    typedef NameT name_type;
+    typedef typename base_type::name_type name_type;
     typedef T value_type;
 
     T data;
 
     template<typename ...Args>
-    basic_named_object(name_type s, Args ...args) :
-        nh_type(std::move(s)), data(std::forward<Args>(args)...) { }
+    basic_res_object(name_type s, Args ...args) :
+        base_type(std::move(s)), data(std::forward<Args>(args)...) { }
 
-    basic_named_object(basic_named_object&& obj) :
-        nh_type(std::move(obj.name_type)), data(std::move(obj)) { }
+    basic_res_object(basic_res_object&& obj) :
+        base_type(std::move(obj.name_type)), data(std::move(obj)) { }
 
     operator value_type&() { return data; }
     operator const value_type&() const { return data; }
@@ -89,32 +96,30 @@ public:
     value_type* operator->() { return &data; }
     const value_type* operator->() const { return &data; }
 
-    ~basic_named_object() { }
+    ~basic_res_object() { }
     std::string type_name() const override {
         return typeid(T).name();
     }
 };
 
-template<typename NameT, typename T>
-using fixed_name_pair = basic_named_object<T, false, NameT>;
-template<typename T>
-using fixed_str_obj = fixed_name_pair<std::string, T>;
-
-template<typename NameT>
+template<typename NameT,
+    typename ValueT = base_named_object<false, NameT>,
+    typename = typename std::enable_if<std::is_base_of<base_named_object<false, NameT>, ValueT>::value>::type>
 class basic_res_pool {
 public:
     typedef NameT name_type;
+    typedef ValueT stor_base_type;
+    typedef std::weak_ptr<stor_base_type> stor_base_ref;
 
     template<typename T>
-    using stor_type = fixed_name_pair<name_type, T>;
+    using stor_type = basic_res_object<T, stor_base_type>;
     template<typename T>
     using stor_ref = std::weak_ptr<stor_type<T>>;
     template<typename T>
     using stor_const_ref = std::weak_ptr<const stor_type<T>>;
 
 private:
-    std::unordered_map<name_type,
-        std::shared_ptr<res_storage_base>> data_;
+    std::unordered_map<name_type, std::shared_ptr<stor_base_type>> data_;
     bool type_hint_ = false;
     bool redef_ = false;
 
@@ -168,6 +173,14 @@ public:
                 p->second->template assert_type<T>();
             return std::dynamic_pointer_cast<stor_type<T>>(p->second);
         }
+    }
+
+    stor_base_ref ref(const name_type& n) const {
+        auto p = data_.find(n);
+        if(p == data_.end() || !bool(p->second))
+            return stor_base_ref();
+        else
+            return p->second;
     }
 
     template<typename T>

@@ -31,6 +31,11 @@ TEST_CASE(test_scm_shader) {
             (find-obj-by-name "blinn-phong"))
         )EOF")));
 
+    assert_true(scm_is_true(scm_c_eval_string(R"EOF(
+        (equal? "blinn-phong"
+            (get-obj-name blinn-phong-shader))
+        )EOF")));
+
     string src;
 
     {

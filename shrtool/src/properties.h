@@ -42,11 +42,19 @@ struct universal_property : universal_property<Args...>
     typedef T value_type;
     value_type data;
     static constexpr size_t count = parent_type::count + 1;
+
+    universal_property& operator!() {
+        parent_type::changed_ = true;
+        return *this;
+    }
 };
 
 template<typename T>
 struct universal_property<T>
 {
+protected:
+    bool changed_;
+
 public:
     typedef void parent_type;
 
@@ -63,6 +71,19 @@ public:
     typedef T value_type;
     value_type data;
     static constexpr size_t count = 1;
+
+    universal_property operator!() {
+        changed_ = true;
+        return *this;
+    }
+
+    void mark_applied() {
+        changed_ = false;
+    }
+
+    bool is_changed() const {
+        return changed_;
+    }
 };
 
 template<size_t I, typename UniProp>
@@ -207,6 +228,14 @@ public:
     static void copy(const input_type& i, uint8_t* o) {
         copy__<0, input_type>(&i, o);
     }
+
+    static bool updated(const input_type& i) {
+        return i.is_changed();
+    }
+
+    static void mark_applied(input_type& i) {
+        i.mark_applied();
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -250,7 +279,7 @@ struct dynamic_property_storage : dynamic_property_storage_base {
 };
 
 struct dynamic_property {
-private:
+protected:
     std::vector<std::unique_ptr<dynamic_property_storage_base>> storage_;
     bool type_hint_;
 
@@ -258,6 +287,8 @@ private:
     mutable std::vector<size_t> offsets_;
     mutable size_t size_in_bytes_ = 0;
     mutable bool item_type_updated_ = false;
+
+    bool changed_ = true;
 
     void update_offsets_() const {
         if(!item_type_updated_) return;
@@ -278,6 +309,8 @@ private:
     }
 
 public:
+    void force_offset_update() { item_type_updated_ = true; }
+
     void type_hint_enabled(bool b) { type_hint_ = b; }
     bool type_hint_enabled() const { return type_hint_; }
 
@@ -347,6 +380,24 @@ public:
         return p->v;
     }
 
+    dynamic_property& operator!() {
+        changed_ = true;
+        return *this;
+    }
+
+    bool is_changed() const { return changed_; }
+    void mark_applied() { changed_ = false; }
+
+    template<typename T>
+    T& set(size_t i, const T& t) {
+        return (!*this).get<T>(i) = t;
+    }
+
+    template<typename T>
+    T& set(size_t i, T&& t) {
+        return (!*this).get<T>(i) = std::move(t);
+    }
+
     template<typename T>
     const T& get(size_t i) const {
         if(storage_.size() < i + 1)
@@ -368,6 +419,11 @@ public:
 
         return p->v;
     }
+
+    void erase(size_t i) {
+        if(i < storage_.size())
+            storage_[i].reset(nullptr);
+    }
 };
 
 template<>
@@ -378,6 +434,14 @@ struct prop_trait<dynamic_property> {
 
     static size_t size(const input_type& i) { return i.size_in_bytes(); }
     static void copy(const input_type& i, uint8_t* o) { i.copy(o); }
+
+    static bool updated(const input_type& i) {
+        return i.is_changed();
+    }
+
+    static void mark_applied(input_type& i) {
+        i.mark_applied();
+    }
 };
 
 }

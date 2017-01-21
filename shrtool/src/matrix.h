@@ -825,6 +825,17 @@ inline matrix<T, 4, 4> translate(col<T, 4> t)
 }
 
 template<typename T = double>
+inline matrix<T, 4, 4> translate(col<T, 3> t)
+{
+    return matrix<T, 4, 4> {
+        1, 0,    0,    t[0],
+        0,    1, 0,    t[1],
+        0,    0,    1, t[2],
+        0,    0,    0,    1,
+    };
+}
+
+template<typename T = double>
 inline matrix<T, 4, 4> scale(T x, T y, T z)
     { return diagonal({x, y, z, 1}); }
 

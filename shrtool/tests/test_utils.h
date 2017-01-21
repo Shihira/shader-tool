@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cstdlib>
 
 #include "unit_test.h"
 #include "singleton.h"
@@ -7,6 +8,8 @@
 #include "shading.h"
 
 namespace shrtool {
+
+#ifndef NO_GUI_TEST
 
 class gui_fixture_base;
 
@@ -82,6 +85,7 @@ public:
     virtual void do_update() { }
     virtual void do_draw() = 0;
     virtual void do_keypress(int key, int modifiers) { }
+    virtual void do_keyrelease(int key, int modifiers) { }
     virtual void operator() () = 0;
 
     enum { PENDING, RUNNING, FINISHED } state = PENDING;
@@ -109,6 +113,8 @@ void gui_test_context::key_callback(GLFWwindow* window,
 
     if(action == GLFW_PRESS)
         inst().active_test->do_keypress(key, mods);
+    else if(action == GLFW_RELEASE)
+        inst().active_test->do_keyrelease(key, mods);
 }
 
 struct singlefunc_fixture : gui_fixture_base
@@ -116,12 +122,30 @@ struct singlefunc_fixture : gui_fixture_base
     std::function<void()> update;
     std::function<void()> draw;
     std::function<void(int, int)> keypress;
+    std::function<void(int, int)> keyrelease;
 
     void do_update() override { if(update) update(); }
     void do_draw() override { if(draw) draw(); }
     void do_keypress(int key, int modifiers) override
         { if(keypress) keypress(key, modifiers); }
+    void do_keyrelease(int key, int modifiers) override
+        { if(keyrelease) keyrelease(key, modifiers); }
 };
+
+#endif
+
+inline std::string locate_assets(const std::string& fn)
+{
+    const char* cp = std::getenv("SHRTOOL_ASSETS_DIR");
+    if(!cp) return fn;
+
+    std::string path = cp;
+    if(path.back() == '/' || path.back() == '\\')
+        path += fn;
+    else path += "/" + fn;
+
+    return path;
+}
 
 }
 

@@ -115,11 +115,22 @@ TEST_CASE_FIXTURE(test_shading, singlefunc_fixture) {
     render_target::screen.enable_depth_test(true);
 
     ifstream shr_fs(locate_assets("shaders/blinn-phong.scm"));
+    ifstream tp_fs(locate_assets("models/teapot.obj"));
+    ifstream chs_fs(locate_assets("models/chess.obj"));
 
     shader_info si = shader_parser::load(shr_fs);
-    auto s = provider<shader_info, shader>::load(si);
     mesh_uv_sphere ms(2, 16, 8, false);
-    auto a = provider<mesh_uv_sphere, vertex_attr_vector>::load(ms);
+    vector<mesh_indexed> tp = mesh_io_object::load(tp_fs);
+    vector<mesh_indexed> chs = mesh_io_object::load(chs_fs);
+
+    size_t mesh_i = 0;
+    vector<mesh_indexed*> meshes = { &ms, &tp[0], &chs[2] };
+    vector<fmat4> mesh_mats = {
+        tf::identity<float>(),
+        tf::scale<float>(1./30, 1./30, 1./30),
+        tf::scale<float>(1./60, 1./60, 1./60) *
+            tf::translate<float>(- find_average(chs[2]).cutdown<fcol3>()),
+    };
 
     universal_property<fcol4, fcol4, fcol4> mat_data(
             fcol4 { 0.1f, 0.1f, 0.13f, 1 },
@@ -132,40 +143,72 @@ TEST_CASE_FIXTURE(test_shading, singlefunc_fixture) {
             fcol4 { 0, 1, 5, 1 }
         );
 
-    fmat4 model_mat = tf::identity<float>();
     fmat4 view_mat = inverse(
             tf::rotate<float>(M_PI / 8, tf::yOz) *
             tf::translate<float>(item_get<2>(ill_data)));
     fmat4 proj_mat = tf::perspective<float>(M_PI / 4, 4.0 / 3, 1, 100);
 
     universal_property<fmat4, fmat4> mvp_data(
-            proj_mat * view_mat * model_mat,
-            model_mat
+            proj_mat * view_mat * mesh_mats[mesh_i],
+            mesh_mats[mesh_i]
         );
 
-    auto pmvp = provider<decltype(mvp_data), property_buffer>::load(mvp_data);
-    auto pill = provider<decltype(ill_data), property_buffer>::load(ill_data);
-    auto pmat = provider<decltype(mat_data), property_buffer>::load(mat_data);
+    provided_render_task::provider_bindings bindings;
+    provided_render_task t(bindings);
+    t.set_shader(si);
+    t.set_target(render_target::screen);
+    t.set_attributes(ms);
+    t.set_property("transfrm", mvp_data);
+    t.set_property("illum", ill_data);
+    t.set_property("material", mat_data);
 
-    s.property("transfrm", pmvp);
-    s.property("illum", pill);
-    s.property("material", pmat);
+    bool actions[4] = { false, false, false, false, };
 
     update = [&]() {
-        model_mat *= tf::rotate<float>(M_PI / 120, tf::zOx);
+        bool updated = false;
+        fmat4& model_mat = mesh_mats[mesh_i];
 
-        item_get<0>(mvp_data) = proj_mat * view_mat * model_mat;
-        item_get<1>(mvp_data) = model_mat;
+        if(actions[0] && (updated |= actions[0]))
+            model_mat = tf::rotate<float>(M_PI / 120, tf::zOx) * model_mat;
+        if(actions[1] && (updated |= actions[1]))
+            model_mat = tf::rotate<float>(-M_PI / 120, tf::zOx) * model_mat;
+        if(actions[2] && (updated |= actions[2]))
+            model_mat = tf::rotate<float>(M_PI / 120, tf::yOz) * model_mat;
+        if(actions[3] && (updated |= actions[3]))
+            model_mat = tf::rotate<float>(-M_PI / 120, tf::yOz) * model_mat;
 
-        provider<decltype(mvp_data), property_buffer>::update(
-                mvp_data, pmvp, true);
+        if(!updated) return;
+
+        item_get<0>(!mvp_data) = proj_mat * view_mat * model_mat;
+        item_get<1>(!mvp_data) = model_mat;
+    };
+
+    keyrelease = [&](int key, int mod) {
+        if(key == GLFW_KEY_LEFT) actions[0] = false;
+        else if(key == GLFW_KEY_RIGHT) actions[1] = false;
+        else if(key == GLFW_KEY_UP) actions[2] = false;
+        else if(key == GLFW_KEY_DOWN) actions[3] = false;
+    };
+
+    keypress = [&](int key, int mod) {
+        if(key == GLFW_KEY_LEFT) actions[0] = true;
+        else if(key == GLFW_KEY_RIGHT) actions[1] = true;
+        else if(key == GLFW_KEY_UP) actions[2] = true;
+        else if(key == GLFW_KEY_DOWN) actions[3] = true;
+        else if(key == GLFW_KEY_SPACE) {
+            mesh_i = (mesh_i + 1) % meshes.size();
+            t.set_attributes(*meshes[mesh_i]);
+
+            item_get<0>(!mvp_data) = proj_mat * view_mat * mesh_mats[mesh_i];
+            item_get<1>(!mvp_data) = mesh_mats[mesh_i];
+        }
     };
 
     draw = [&]() {
         render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
         render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
 
-        s.draw(a);
+        t.render();
     };
 
     main_loop();
@@ -174,7 +217,7 @@ TEST_CASE_FIXTURE(test_shading, singlefunc_fixture) {
 int main(int argc, char* argv[])
 {
     scm_init_guile();
-    gui_test_context::init("330 core", "test_prov_shading");
+    gui_test_context::init("330 core", "test_render_queue");
     test_main(argc, argv);
 }
 

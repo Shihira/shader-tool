@@ -149,7 +149,7 @@ public:
 
         template<typename Prov, typename T, typename Bindings>
         static typename Prov::output_type& set_binding(
-                const T& obj, Bindings& b) {
+                T& obj, Bindings& b) {
             size_t hashcode = reinterpret_cast<size_t>(&obj);
             auto res = b.find(hashcode);
             if(res == b.end()) {
@@ -172,11 +172,13 @@ private:
 public:
     provided_render_task(provider_bindings& pb) : pb_(pb) { }
 
+    using shader_render_task::set_shader;
     template<typename T, typename Enabled = typename std::enable_if<
         !std::is_same<T, shader>::value>::type>
     void set_shader(T& obj) {
         shader& r = provider_bindings::set_binding<provider<T, shader>>(
                 obj, pb_.shader_bindings);
+        set_shader(r);
         shader_updater = [&obj, &r]() {
             provider<T, shader>::update(obj, r, false);
         };
@@ -230,12 +232,12 @@ public:
     }
 
     void update() const {
-        shader_updater();
-        target_updater();
-        attr_updater();
+        if(shader_updater) shader_updater();
+        if(target_updater) target_updater();
+        if(attr_updater) attr_updater();
 
         for(auto& pu : prop_updater)
-            pu.second();
+            if(pu.second) pu.second();
     }
 
     void render() const override {

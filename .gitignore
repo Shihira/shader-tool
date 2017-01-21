@@ -2,5 +2,6 @@ build/*
 !/build/set_env.sh
 !/build/test_all.sh
 assets/textures
+assets/models
 
 .ycm_extra_conf.py

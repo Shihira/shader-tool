@@ -1,11 +1,13 @@
 #define TEST_SUITE "test_shader_parser"
 
 #define EXPOSE_EXCEPTION
+#define NO_GUI_TEST
 
 #include <sstream>
 #include <fstream>
 
 #include "unit_test.h"
+#include "test_utils.h"
 #include "shader_parser.h"
 
 using namespace std;

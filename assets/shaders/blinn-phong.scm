@@ -50,6 +50,7 @@
 
         void main() {
             fragNormal = (transpose(inverse(mMatrix)) * vec4(normal, 0)).xyz;
+            fragNormal = normalize(fragNormal);
 
             gl_Position = mvpMatrix * position;
             fragPosition = mMatrix * position;

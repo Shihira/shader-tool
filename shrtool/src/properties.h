@@ -229,7 +229,7 @@ public:
         copy__<0, input_type>(&i, o);
     }
 
-    static bool updated(const input_type& i) {
+    static bool is_changed(const input_type& i) {
         return i.is_changed();
     }
 
@@ -435,7 +435,7 @@ struct prop_trait<dynamic_property> {
     static size_t size(const input_type& i) { return i.size_in_bytes(); }
     static void copy(const input_type& i, uint8_t* o) { i.copy(o); }
 
-    static bool updated(const input_type& i) {
+    static bool is_changed(const input_type& i) {
         return i.is_changed();
     }
 

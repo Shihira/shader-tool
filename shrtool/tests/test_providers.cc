@@ -277,12 +277,12 @@ TEST_CASE(test_prop_update) {
     assert_equal_print(d.is_copied, false);
     assert_equal_print(read_data, 23);
 
-    d.set(50);
+    d.set(5000);
     d.is_copied = false;
     prov::update(d, p, false);
     p.read(&read_data, 1);
     assert_equal_print(d.is_copied, true);
-    assert_equal_print(read_data, 50);
+    assert_equal_print(read_data, 5000);
 }
 
 int main(int argc, char* argv[])

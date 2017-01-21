@@ -127,9 +127,11 @@ struct indexed_attr {
         size_t index_of_idx_;
     };
 
+    // refer is itself a reference, which binds itself with its parent, instead
+    // of binding to the container.
     ContainerRef& refer;
 
-    typedef ContainerRef container_type_refernce;
+    typedef ContainerRef& container_type_refernce;
     typedef T value_type;
     std::vector<size_t> indices;
 
@@ -137,11 +139,10 @@ struct indexed_attr {
     typedef indexed_attr_iterator<const T, const indexed_attr&> const_iterator;
 
     indexed_attr(ContainerRef& r) : refer(r) { }
-    indexed_attr(indexed_attr&& idx):
-        refer(idx.refer),
-        indices(std::move(idx.indices)) { }
-    indexed_attr(const indexed_attr& idx):
-        refer(idx.refer), indices(idx.indices) { }
+    indexed_attr(ContainerRef& r, const std::vector<size_t>& i) :
+        refer(r), indices(i) { }
+    indexed_attr(ContainerRef& r, std::vector<size_t>&& i) :
+        refer(r), indices(std::move(i)) { }
 
     iterator begin() { return iterator(*this, 0); }
     iterator end() { return iterator(*this, indices.size()); }
@@ -206,17 +207,17 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
         stor_positions(im.stor_positions),
         stor_normals(im.stor_normals),
         stor_uvs(im.stor_uvs),
-        positions(im.positions),
-        normals(im.normals),
-        uvs(im.uvs) { }
+        positions(stor_positions, im.positions.indices),
+        normals(stor_normals, im.normals.indices),
+        uvs(stor_uvs, im.uvs.indices) { }
 
     mesh_indexed(mesh_indexed&& im) :
         stor_positions(std::move(im.stor_positions)),
         stor_normals(std::move(im.stor_normals)),
         stor_uvs(std::move(im.stor_uvs)),
-        positions(std::move(im.positions)),
-        normals(std::move(im.normals)),
-        uvs(std::move(im.uvs)) { }
+        positions(stor_positions, std::move(im.positions.indices)),
+        normals(stor_normals, std::move(im.normals.indices)),
+        uvs(stor_uvs, std::move(im.uvs.indices)) { }
 };
 
 struct mesh_uv_sphere : mesh_indexed {
@@ -305,6 +306,16 @@ struct attr_trait<T, typename T::mesh_tag> {
         }
     }
 };
+
+template<typename T>
+inline math::col4 find_average(const T& m)
+{
+    math::col4 sum = { 0, 0, 0, 0 };
+    for(int i = 0; i < attr_trait<T>::count(m); i++) {
+        sum += m.positions[i];
+    }
+    return sum / double(attr_trait<T>::count(m));
+}
 
 }
 

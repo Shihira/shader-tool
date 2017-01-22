@@ -28,6 +28,7 @@ DEFINE_TRIVIAL_ERROR(restriction_error)
 DEFINE_TRIVIAL_ERROR(resolve_error)
 DEFINE_TRIVIAL_ERROR(type_matching_error)
 DEFINE_TRIVIAL_ERROR(not_found_error)
+DEFINE_TRIVIAL_ERROR(duplication_error)
 
 }
 

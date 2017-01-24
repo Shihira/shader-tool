@@ -2,6 +2,8 @@
 
 #define EXPOSE_EXCEPTION
 
+#include <iostream>
+
 #include "unit_test.h"
 #include "reflection.h"
 
@@ -20,12 +22,16 @@ public:
         int t = *a; *a = *b; *b = t;
         return *a > *b ? a : b;
     }
+    static int& max_ref(int& a, int& b) {
+        return a > b ? a : b;
+    }
 
     static void meta_reg_() {
         meta_manager::reg_class<static_func_class>("static_func_class")
             .function("add", &static_func_class::add)
             .function("addf", &static_func_class::addf)
             .function("swap", &static_func_class::swap)
+            .function("max_ref", &static_func_class::max_ref)
             .function("swap_and_max", &static_func_class::swap_and_max);
     }
 };
@@ -52,10 +58,15 @@ TEST_CASE(test_conversion)
     meta_manager::init();
     static_func_class::meta_reg_();
 
+    instance res_1 = instance::make(58).cast_to(
+            *meta_manager::find_meta<float>());
+    assert_true(res_1.get_meta() == *meta_manager::find_meta<float>());
+    assert_float_equal(res_1.get<float>(), 58);
+
     meta* m = meta_manager::find_meta("static_func_class");
-    instance res_1 = m->call("addf", instance::make(7), instance::make(8));
+    instance res_2 = m->call("addf", instance::make(7), instance::make(8));
     assert_true(res_1.get_meta() == *meta_manager::find_meta("float"));
-    assert_float_equal(res_1.get<float>(), 15);
+    assert_float_equal(res_2.get<float>(), 15);
 }
 
 TEST_CASE(test_pointer)
@@ -67,10 +78,17 @@ TEST_CASE(test_pointer)
     int a = 12;
     int b = 56;
     instance res_1 = m->call("swap_and_max",
-            instance::makeptr(&a), instance::makeptr(&b));
+            instance::make(&a), instance::make(&b));
     assert_equal_print(a, 56);
     assert_equal_print(b, 12);
-    assert_equal_print(res_1.getptr<int>(), &a);
+    assert_equal_print(&res_1.get<int>(), &a);
+
+    int c = 100;
+    int d = 200;
+    instance res_2 = m->call("max_ref",
+            instance::make(&c), instance::make(&d));
+    assert_equal_print(res_2.get<int>(), 200);
+    assert_equal_print(&res_2.get<int>(), &d);
 }
 
 struct member_func_class {

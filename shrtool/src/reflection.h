@@ -2,7 +2,7 @@
 #define REFLECTION_H_INCLUDED
 
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <functional>
 #include <vector>
 #include <typeinfo>
@@ -26,7 +26,7 @@ private:
 
     std::string name_;
     const std::type_info& type_info;
-    std::unordered_map<std::string, fun_type> functions;
+    std::map<std::string, fun_type> functions;
 
 public:
     meta(std::string n, const std::type_info& ti) :
@@ -139,14 +139,15 @@ private:
 
     meta_manager() { }
 
-    std::unordered_map<size_t, meta> metas;
-    std::unordered_map<std::string, size_t> name_to_hash;
+    std::map<size_t, meta> metas;
+    std::map<std::string, size_t> name_to_hash;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
 struct instance_stor {
     virtual instance_stor* clone() const = 0;
+    virtual ~instance_stor() { }
 };
 
 template<typename T>
@@ -160,28 +161,42 @@ struct typed_instance_stor : instance_stor {
         return new typed_instance_stor(data);
     }
 
+    virtual ~typed_instance_stor() { }
+
     T data;
 };
 
 struct instance {
-    template<typename T>
+    template<
+        typename T,
+        typename Enable = typename std::enable_if<
+            !std::is_pointer<T>::value>::type>
     static instance make(T o) {
         instance i;
-        i.m = meta_manager::find_meta<T>();
+        i.m = meta_manager::find_meta<
+            typename std::remove_reference<T>::type>();
         if(!i.m) throw not_found_error("Type has not been registered");
-        i.stor.reset(new typed_instance_stor<T>(std::forward<T>(o)));
+        i.stor.reset(new typed_instance_stor<
+            typename std::remove_reference<T>::type>(std::move(o)));
 
         return std::move(i);
     }
 
+    /*
+     * Note: when you specify type T manually, remember not to bring * along.
+     */
     template<typename T>
-    static instance makeptr(T* p) {
-        return make<void*>(reinterpret_cast<T*>(p));
+    static instance make(T* p) {
+        instance i = make<void*, void>(reinterpret_cast<T*>(p));
+        i.ptrm = meta_manager::find_meta<T>();
+        return std::move(i);
     }
 
     instance() { }
-    instance(instance&& i) : m(i.m), stor(std::move(i.stor)) { }
-    instance(const instance& i) : m(i.m), stor(i.stor->clone()) { }
+    instance(instance&& i) :
+        m(i.m), ptrm(i.ptrm), stor(std::move(i.stor)) { }
+    instance(const instance& i) :
+        m(i.m), ptrm(i.ptrm), stor(i.stor->clone()) { }
 
     instance& operator=(instance&& i) {
         m = i.m;
@@ -196,23 +211,31 @@ struct instance {
     }
 
     bool is_null() const { return !stor.get(); }
+    bool is_pointer() const { return m->is_same<void*>(); }
 
     const meta& get_meta() { return *m; }
+    const meta* get_pointer_meta() { return ptrm; }
 
+    /*
+     * You cannot get pointer itself through calling get (except for void*),
+     * because get always convert pointers to references. If you exactly need a
+     * pointer address, do `&inst.get<int>()`
+     */
     template<typename T>
     T& get() {
-        if(!m->is_same<T>())
-            throw restriction_error("Type not match");
-        return dynamic_cast<typed_instance_stor<T>*>(stor.get())->data;
-    }
+        if(m->is_same<T>()) {
+            auto p = dynamic_cast<typed_instance_stor<T>*>(stor.get());
+            if(!p) throw restriction_error("Conversion failed");
+            return p->data;
+        }
 
-    template<typename T>
-    T* getptr() {
-        if(!m->is_same<void*>())
-            throw restriction_error("Type not match");
-        return
-            reinterpret_cast<T*>(dynamic_cast<
-                    typed_instance_stor<void*>*>(stor.get())->data);
+        if(m->is_same<void*>() && (!ptrm || ptrm->is_same<T>())) {
+            auto p = dynamic_cast<typed_instance_stor<void*>*>(stor.get());
+            if(!p) throw restriction_error("Conversion failed");
+            return *reinterpret_cast<T*>(p->data);
+        }
+
+        throw restriction_error("Type not match");
     }
 
     instance cast_to(const meta& rm) const {
@@ -224,24 +247,98 @@ struct instance {
 
 private:
     const meta* m = nullptr;
+    const meta* ptrm = nullptr;
     std::unique_ptr<instance_stor> stor;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // func_caller and function former
-//
-// Since its impossible to register pointer to all types, pointers are all cast
-// to void*, whatever they point to. All other types are cast to references
-// when invoking a function. Not to distinguish const reference or not.
+
+/*
+ * Policies on Type Determination
+ *
+ * For functions, inspect their return value types and argument types, and when:
+ *
+ * - Return value type is a ?, it will be converted to ?
+ *     - T&: instance of (void*, T)
+ *     - T*: instance of (void*, T)
+ *     - T: instance of T
+ * - Argument type is a ?, instances are expected to be an ?
+ *     - T&: instance of T or ttcbct T or (void*, T)
+ *     - T*: instance of (void*, T)
+ *     - T: instance of T or ttcbct T
+ *
+ * ttcbct = type that can be converted to
+ *
+ * An instance of pointer is actually an instance of type void* which has an
+ * additional property "type to which it points", denoted as (void*, T).
+ * Pointing to an unknown type is also allowed while its additional property is
+ * set to null, which may bring about unsafe type conversion. In the list above,
+ * assuming T is not registered, things you can get or pass in are no more than
+ * instances of (void*, T)
+ *
+ * ALL CONST MODIFIER WILL BE REMOVED IMMEDIATELY IN THIS PROCESS.
+ */
 
 template<typename T>
-struct raw_type_ {
-    typedef typename std::decay<T>::type type;
+struct ret_type_ {
+    static instance convert(T t) {
+        return instance::make<typename std::decay<T>::type>(std::move(t));
+    }
 };
 
 template<typename T>
-struct raw_type_<T*> {
-    typedef void* type;
+struct ret_type_<T*> {
+    static instance convert(T* t) {
+        return instance::make<typename std::remove_reference<T>::type>(t);
+    }
+};
+
+template<typename T>
+struct ret_type_<T&> {
+    static instance convert(T& t) {
+        return instance::make<typename std::remove_cv<T>::type>(&t);
+    }
+};
+
+template<typename T>
+struct arg_type_ {
+    instance tmp;
+    typedef typename std::remove_cv<T>::type pure_t;
+    pure_t& convert(instance& t) {
+        if(t.get_meta().is_same<pure_t>())
+            return t.get<pure_t>();
+        const meta* target_m = meta_manager::find_meta<T>();
+        if(!target_m)
+            throw not_found_error("Type has not been registered");
+        tmp = t.cast_to(*target_m);
+        return tmp.get<pure_t>();
+    }
+};
+
+template<typename T>
+struct arg_type_<T*> {
+    typedef typename std::remove_cv<T>::type pure_t;
+    pure_t*& convert(instance& t) {
+        if(!t.is_pointer())
+            throw restriction_error("Not a pointer");
+        const meta* ptrm = t.get_pointer_meta();
+        if(ptrm != meta_manager::find_meta<pure_t>()) // TODO: stricter?
+            throw restriction_error("Type not matched");
+
+        return *reinterpret_cast<pure_t**>(&t.get<void*>());
+    }
+};
+
+template<typename T>
+struct arg_type_<T&> : arg_type_<T>, arg_type_<T*> {
+    typedef typename std::remove_cv<T>::type pure_t;
+    pure_t& convert(instance& t) {
+        if(t.is_pointer())
+            return *arg_type_<T*>::convert(t);
+        else
+            return arg_type_<T>::convert(t);
+    }
 };
 
 template<typename RetType>
@@ -254,37 +351,22 @@ template<typename RetType, typename Head, typename ... Args>
 inline RetType func_caller(instance* args[],
         std::function<RetType(Head, Args...)> f)
 {
-    typedef typename raw_type_<Head>::type raw_type;
-    typedef typename std::remove_reference<Head>::type* ptr_type;
-    const meta* target_meta = meta_manager::find_meta<raw_type>();
-    if(!target_meta)
-        throw not_found_error("Type has not been registered");
+    arg_type_<Head> cur_arg;
+    Head& h = cur_arg.convert(*args[0]);
 
-    ptr_type head_arg;
-
-    if(args[0]->get_meta() != *target_meta) {
-        instance tmp = std::move(args[0]->cast_to(*target_meta));
-        head_arg = reinterpret_cast<ptr_type>(&(tmp.get<raw_type>()));
-
-        return func_caller(args + 1, std::function<RetType(Args...)>(
-                [&](Args ... rest) -> RetType {
-                    return f(*head_arg, rest ...);
-                }));
-    } else {
-        head_arg = reinterpret_cast<ptr_type>(&(args[0]->get<raw_type>()));
-
-        return func_caller(args + 1, std::function<RetType(Args...)>(
-                [&](Args ... rest) -> RetType {
-                    return f(*head_arg, rest ...);
-                }));
-    }
+    return func_caller(args + 1, std::function<RetType(Args...)>(
+            [&](Args ... rest) -> RetType {
+                return f(h, rest ...);
+            }));
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 template<typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (*f) (Args...))
 {
     functions[std::move(name)] = [f](instance* args[]) -> instance {
-        return instance::make<typename raw_type_<RetType>::type>(
+        return ret_type_<RetType>::convert(
                 func_caller(args, std::function<RetType(Args...)>(f)));
     };
 
@@ -306,7 +388,7 @@ template<typename T, typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (T::*f) (Args...))
 {
     functions[std::move(name)] = [f](instance* args[]) -> instance {
-        return instance::make<typename raw_type_<RetType>::type>(
+        return ret_type_<RetType>::convert(
             func_caller(args + 1, std::function<RetType(Args...)>(
                 [&args, f](Args ... a) -> RetType {
                     return (args[0]->get<T>().*f)(a ...);

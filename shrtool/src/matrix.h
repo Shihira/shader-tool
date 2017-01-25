@@ -16,6 +16,8 @@
 #include <memory>
 #include <initializer_list>
 
+#include "traits.h"
+
 namespace shrtool {
 
 namespace math {
@@ -772,6 +774,64 @@ cross(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
     return res;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// dynmatrix: not useful c++ natively, mostly used in reflection
+
+template<typename T>
+struct dynmatrix {
+    typedef T value_type;
+
+    dynmatrix() { }
+    dynmatrix(size_t cols, size_t rows) {
+        assign(cols, rows);
+    }
+    dynmatrix(size_t cols, size_t rows,
+            const std::initializer_list<value_type>& d) {
+        assign(cols, rows);
+        std::copy(d.begin(), d.end(), data_);
+    }
+    dynmatrix(const dynmatrix& d) {
+        assign(d.cols_, d.rows_);
+        std::copy(d.data_, d.data_ + d.elem_count, data_);
+    }
+    dynmatrix(dynmatrix&& d) :
+        cols_(d.cols_), rows_(d.rows_) {
+        std::swap(d.data_, data_);
+    }
+
+    void assign(size_t cols, size_t rows) {
+        if(data_) delete[] data_;
+        cols_ = cols;
+        rows_ = rows;
+        data_ = new value_type[cols * rows];
+    }
+
+    ~dynmatrix() {
+        if(data_) delete[] data_;
+    }
+
+    value_type* data() { return data_; }
+    value_type& at(size_t r, size_t c) {
+        return data_[r * rows_ + c];
+    }
+
+    operator bool() const {
+        return data_;
+    }
+
+    size_t cols() { return cols_; }
+    size_t rows() { return rows_; }
+    size_t elem_count() { return cols_ * rows_; }
+
+private:
+    size_t cols_ = 0;
+    size_t rows_ = 0;
+
+    value_type* data_ = nullptr;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 namespace tf {
 
 typedef enum { xOy, yOz, zOx } plane;
@@ -876,6 +936,86 @@ inline matrix<T, 4, 4> orthographic(
 } // tf
 
 } // math
+
+////////////////////////////////////////////////////////////////////////////////
+// traits
+
+template<typename T, size_t M, size_t N>
+struct item_trait<math::matrix<T, M, N>>
+{
+    typedef float value_type;
+    static constexpr size_t size() {
+        return M * N * sizeof(value_type);
+    }
+    static constexpr size_t align() {
+        return item_trait<math::col<value_type, M>>::align();
+    }
+
+    static void copy(const math::matrix<T, M, N>& m, value_type* buf) {
+        for(size_t n = 0; n < N; ++n, buf += M) {
+            const auto& c = m.col(n);
+            std::copy(c.begin(), c.end(), buf);
+        }
+    }
+
+    static const char* glsl_type_name() {
+        static const char name_[] = {
+            'm', 'a', 't', M + '0',
+            M == N ? '\0' : 'x', N + '0', '\0' };
+        return name_;
+    }
+};
+
+template<typename T, size_t M>
+struct item_trait<math::matrix<T, M, 1>>
+{
+    typedef T value_type;
+    static constexpr size_t size() {
+        return M * sizeof(value_type);
+    }
+    static constexpr size_t align() {
+        return (M < 3 ? M : 4) * sizeof(value_type);
+    }
+
+    static void copy(const math::col<T, M>& c, value_type* buf) {
+        std::copy(c.begin(), c.end(), buf);
+    }
+
+    static const char* glsl_type_name() {
+        static const char name_[] = {
+            std::is_same<value_type, uint8_t>::value ? 'b' :
+            std::is_same<value_type, int>::value ? 'i' :
+            std::is_same<value_type, double>::value ? 'd' : '\0',
+            'v', 'e', 'c', M + '0', '\0' };
+        static const char* name_p = name_[0] ? name_ : name_ + 1;
+
+        return name_p;
+    }
+};
+
+template<typename T>
+struct item_trait<math::dynmatrix<T>>
+{
+    typedef T value_type;
+    static size_t size(const math::dynmatrix<T>& m) {
+        return sizeof(value_type) * m.elem_count();
+    }
+    static size_t align(const math::dynmatrix<T>& m) {
+        size_t r = m.rows();
+        return sizeof(value_type) * (r < 3 ? r : 4);
+    }
+    static void copy(const math::dynmatrix<T>& m, value_type* buf) {
+        std::copy(m.data(), m.data() + m.elem_count(), buf);
+    }
+    static std::string glsl_type_name(const math::dynmatrix<T>& m) {
+        if(m.cols() == 1) {
+            return std::string("vec") + std::to_string(m.rows());
+        } else {
+            return std::string("mat") + std::to_string(m.rows()) +
+                "x" + std::to_string(m.cols);
+        }
+    }
+};
 
 } // shrtool
 

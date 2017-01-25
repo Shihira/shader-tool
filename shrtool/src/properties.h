@@ -136,13 +136,13 @@ private:
     typedef typename universal_property_item<0, UniProp>::trait trait;
 
     static constexpr size_t base_offset = 
-        (StartAt % trait::align ?
-            trait::align * (StartAt / trait::align + 1) :
+        (StartAt % trait::align() ?
+            trait::align() * (StartAt / trait::align() + 1) :
             StartAt);
 
 public:
     static constexpr size_t value = 
-        item_offset__<I - 1, trait::size + base_offset, up_p>::value;
+        item_offset__<I - 1, trait::size() + base_offset, up_p>::value;
 };
 
 // trivial.
@@ -153,8 +153,8 @@ private:
 
 public:
     static constexpr size_t value = 
-        (StartAt % trait::align ?
-            trait::align * (StartAt / trait::align + 1) :
+        (StartAt % trait::align() ?
+            trait::align() * (StartAt / trait::align() + 1) :
             StartAt);
 };
 
@@ -162,7 +162,7 @@ template<typename UniProp>
 constexpr size_t property_size(const UniProp&)
 {
     return item_offset__<UniProp::count - 1, 0, UniProp>::value +
-        universal_property_item<UniProp::count - 1, UniProp>::trait::size;
+        universal_property_item<UniProp::count - 1, UniProp>::trait::size();
 }
 
 template<typename UniProp>
@@ -264,12 +264,12 @@ struct dynamic_property_storage : dynamic_property_storage_base {
     }
 
     virtual size_t align(size_t start_at) const override {
-        return start_at % trait::align ?
-            (start_at / trait::align + 1) * trait::align : start_at;
+        return start_at % trait::align() ?
+            (start_at / trait::align() + 1) * trait::align() : start_at;
     }
 
     virtual size_t size() const override {
-        return trait::size;
+        return trait::size();
     }
 
     ~dynamic_property_storage() override { }

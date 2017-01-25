@@ -38,8 +38,8 @@ string trim_str(const string& s)
 
 TEST_CASE(test_item_trait)
 {
-    assert_equal(item_trait<math::fcol3>::size, 3 * sizeof(float));
-    assert_equal(item_trait<math::col4>::size, 4 * sizeof(double));
+    assert_equal(item_trait<math::fcol3>::size(), 3 * sizeof(float));
+    assert_equal(item_trait<math::col4>::size(), 4 * sizeof(double));
     assert_equal(item_trait<math::col4>::glsl_type_name(), string("dvec4"));
 }
 

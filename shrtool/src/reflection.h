@@ -9,6 +9,7 @@
 
 #include "singleton.h"
 #include "exception.h"
+#include "traits.h"
 
 namespace shrtool {
 
@@ -22,7 +23,7 @@ struct meta {
     friend struct meta_manager;
 
 private:
-    typedef std::function<instance(instance*[])> fun_type;
+    typedef std::function<instance(instance*[], size_t n)> fun_type;
 
     std::string name_;
     const std::type_info& type_info;
@@ -35,7 +36,7 @@ public:
         functions(std::move(m.functions)) { }
     meta(const meta& m) = delete; // no copy is permitted
 
-    instance apply(const std::string& name, instance* i[]) const;
+    instance apply(const std::string& name, instance* i[], size_t n) const;
     template<typename ... Args>
     instance call(const std::string& name, Args&& ... args) const;
 
@@ -75,9 +76,42 @@ public:
     }
 };
 
+template<typename T>
+struct typed_meta : meta {
+    template<typename To>
+    typed_meta& enable_cast();
+
+    /*
+     * the argument Enable in parameter means to prevent compiler generates code
+     * by default rather than only when the function is called.
+     */
+    template<bool Enable = true>
+    typed_meta& enable_clone() {
+        function("__clone", &clone_<Enable>);
+        return *this;
+    }
+
+    template<bool Enable = true>
+    typed_meta& enable_serialize() {
+        function("__size", &item_trait_adapter<T, size_t, size_t>::size);
+        function("__align", &item_trait_adapter<T, size_t, size_t>::align);
+        function("__raw_into", &item_trait_adapter<T, size_t, size_t>::copy);
+        return *this;
+    }
+
+private:
+    template<typename To>
+    static To cast_(const T& o) { return To(o); }
+
+    template<bool Enable = true>
+    static T clone_(const T& o) {
+        return o;
+    }
+};
+
 struct meta_manager : generic_singleton<meta_manager> {
     template<typename T>
-    static meta& reg_class(const std::string& name) {
+    static typed_meta<T>& reg_class(const std::string& name) {
         auto i = inst().name_to_hash.find(name);
         if(i != inst().name_to_hash.end())
             throw duplication_error(name + " has already been registered");
@@ -85,8 +119,9 @@ struct meta_manager : generic_singleton<meta_manager> {
         size_t h = typeid(T).hash_code();
         inst().name_to_hash[name] = h;
 
-        return inst().metas.insert(std::make_pair(
-                h, meta(name, typeid(T)))).first->second;
+        return static_cast<typed_meta<T>&>(
+            inst().metas.insert(std::make_pair(
+                h, meta(name, typeid(T)))).first->second);
     }
 
     template<typename T>
@@ -102,6 +137,19 @@ struct meta_manager : generic_singleton<meta_manager> {
         else return &(inst().metas.find(i->second)->second);
     }
 
+    template<typename T>
+    static meta& get_meta() {
+        auto m = find_meta<T>();
+        if(!m) throw not_found_error("Type has not yet been registered.");
+        return *m;
+    }
+
+    static meta& get_meta(const std::string& s) {
+        auto m = find_meta(s);
+        if(!m) throw not_found_error("Type has not yet been registered.");
+        return *m;
+    }
+
     static void clear() {
         inst().metas.clear();
         inst().name_to_hash.clear();
@@ -110,12 +158,24 @@ struct meta_manager : generic_singleton<meta_manager> {
     static void init() {
         clear();
 
-        reg_class<char>("byte");
-        reg_class<int>("int");
-        reg_class<size_t>("uint");
-        reg_class<void*>("pointer");
-        reg_class<float>("float");
-        reg_class<double>("double");
+        reg_class<char>("byte")
+            .enable_clone()
+            .enable_serialize();
+        reg_class<int>("int")
+            .enable_clone()
+            .enable_serialize();
+        reg_class<size_t>("uint")
+            .enable_clone()
+            .enable_serialize();
+        reg_class<void*>("pointer")
+            .enable_clone();
+        reg_class<float>("float")
+            .enable_clone()
+            .enable_serialize();
+        reg_class<double>("double")
+            .enable_clone();
+        reg_class<std::string>("string")
+            .enable_clone();
 
         enable_cast<int, size_t>();
         enable_cast<int, float>();
@@ -124,17 +184,11 @@ struct meta_manager : generic_singleton<meta_manager> {
 
     template<typename T1, typename T2>
     static void enable_cast() {
-        meta& meta1 = *find_meta<T1>();
-        meta& meta2 = *find_meta<T2>();
-        std::string func_name = "__to_" + meta2.name();
-
-        meta1.function(func_name, &cast_<T1, T2>);
+        typed_meta<T1>& m = static_cast<typed_meta<T1>&>(get_meta<T1>());
+        m.template enable_cast <T2>();
     }
 
 private:
-    template<typename T1, typename T2>
-    static T2 cast_(const T1& rhs) { return T2(rhs); }
-
     friend class generic_singleton<meta_manager>;
 
     meta_manager() { }
@@ -145,8 +199,19 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+template<typename T>
+template<typename To>
+typed_meta<T>& typed_meta<T>::enable_cast()
+{
+    meta& to_m = meta_manager::get_meta<To>();
+    std::string func_name = "__to_" + to_m.name();
+    function(func_name, &cast_<To>);
+    return *this;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 struct instance_stor {
-    virtual instance_stor* clone() const = 0;
     virtual ~instance_stor() { }
 };
 
@@ -156,10 +221,6 @@ struct typed_instance_stor : instance_stor {
     typed_instance_stor(const typed_instance_stor& rhs) : data(rhs.data) { }
     typed_instance_stor(T&& rhs) : data(std::move(rhs)) { }
     typed_instance_stor(const T& rhs) : data(rhs) { }
-
-    virtual instance_stor* clone() const override {
-        return new typed_instance_stor(data);
-    }
 
     virtual ~typed_instance_stor() { }
 
@@ -173,9 +234,8 @@ struct instance {
             !std::is_pointer<T>::value>::type>
     static instance make(T o) {
         instance i;
-        i.m = meta_manager::find_meta<
+        i.m = &meta_manager::get_meta<
             typename std::remove_reference<T>::type>();
-        if(!i.m) throw not_found_error("Type has not been registered");
         i.stor.reset(new typed_instance_stor<
             typename std::remove_reference<T>::type>(std::move(o)));
 
@@ -195,19 +255,17 @@ struct instance {
     instance() { }
     instance(instance&& i) :
         m(i.m), ptrm(i.ptrm), stor(std::move(i.stor)) { }
-    instance(const instance& i) :
-        m(i.m), ptrm(i.ptrm), stor(i.stor->clone()) { }
+    instance(const instance& i) { operator=(i); }
 
     instance& operator=(instance&& i) {
         m = i.m;
+        ptrm = i.ptrm;
         stor = std::move(i.stor);
         return *this;
     }
 
     instance& operator=(const instance& i) {
-        m = i.m;
-        stor.reset(i.stor->clone());
-        return *this;
+        return operator=(std::move(i.clone()));
     }
 
     bool is_null() const { return !stor.get(); }
@@ -241,8 +299,14 @@ struct instance {
     instance cast_to(const meta& rm) const {
         std::string func_name = "__to_" + rm.name();
         if(!m->has_function(func_name))
-            throw not_found_error("Not type conversion");
+            throw not_found_error("No type conversion");
         return m->call(func_name, *this);
+    }
+
+    instance clone() const {
+        if(!m->has_function("__clone"))
+            throw not_found_error("No cloning");
+        return m->call("__clone", *this);
     }
 
 private:
@@ -308,10 +372,8 @@ struct arg_type_ {
     pure_t& convert(instance& t) {
         if(t.get_meta().is_same<pure_t>())
             return t.get<pure_t>();
-        const meta* target_m = meta_manager::find_meta<T>();
-        if(!target_m)
-            throw not_found_error("Type has not been registered");
-        tmp = t.cast_to(*target_m);
+        meta& target_m = meta_manager::get_meta<pure_t>();
+        tmp = t.cast_to(target_m);
         return tmp.get<pure_t>();
     }
 };
@@ -323,7 +385,7 @@ struct arg_type_<T*> {
         if(!t.is_pointer())
             throw restriction_error("Not a pointer");
         const meta* ptrm = t.get_pointer_meta();
-        if(ptrm != meta_manager::find_meta<pure_t>()) // TODO: stricter?
+        if(!ptrm && ptrm != meta_manager::find_meta<pure_t>()) // TODO: stricter?
             throw restriction_error("Type not matched");
 
         return *reinterpret_cast<pure_t**>(&t.get<void*>());
@@ -342,19 +404,24 @@ struct arg_type_<T&> : arg_type_<T>, arg_type_<T*> {
 };
 
 template<typename RetType>
-inline RetType func_caller(instance*[], std::function<RetType()> f)
+inline RetType func_caller(instance*[], size_t n, std::function<RetType()> f)
 {
+    if(n != 0)
+        throw restriction_error("Number of arguments does not match");
     return f();
 }
 
 template<typename RetType, typename Head, typename ... Args>
-inline RetType func_caller(instance* args[],
+inline RetType func_caller(instance* args[], size_t n,
         std::function<RetType(Head, Args...)> f)
 {
+    if(n != sizeof...(Args) + 1)
+        throw restriction_error("Number of arguments does not match");
+
     arg_type_<Head> cur_arg;
     Head& h = cur_arg.convert(*args[0]);
 
-    return func_caller(args + 1, std::function<RetType(Args...)>(
+    return func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
             [&](Args ... rest) -> RetType {
                 return f(h, rest ...);
             }));
@@ -365,9 +432,9 @@ inline RetType func_caller(instance* args[],
 template<typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (*f) (Args...))
 {
-    functions[std::move(name)] = [f](instance* args[]) -> instance {
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<RetType>::convert(
-                func_caller(args, std::function<RetType(Args...)>(f)));
+                func_caller(args, n, std::function<RetType(Args...)>(f)));
     };
 
     return *this;
@@ -376,8 +443,8 @@ meta& meta::function(std::string name, RetType (*f) (Args...))
 template<typename ... Args>
 meta& meta::function(std::string name, void (*f) (Args...))
 {
-    functions[std::move(name)] = [f](instance* args[]) -> instance {
-        func_caller(args, std::function<void(Args...)>(f));
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
+        func_caller(args, n, std::function<void(Args...)>(f));
         return instance();
     };
 
@@ -387,9 +454,9 @@ meta& meta::function(std::string name, void (*f) (Args...))
 template<typename T, typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (T::*f) (Args...))
 {
-    functions[std::move(name)] = [f](instance* args[]) -> instance {
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<RetType>::convert(
-            func_caller(args + 1, std::function<RetType(Args...)>(
+            func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
                 [&args, f](Args ... a) -> RetType {
                     return (args[0]->get<T>().*f)(a ...);
                 })));
@@ -401,8 +468,8 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...))
 template<typename T, typename ... Args>
 meta& meta::function(std::string name, void (T::*f) (Args...))
 {
-    functions[std::move(name)] = [f](instance* args[]) -> instance {
-        func_caller(args + 1, std::function<void(Args...)>(
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
+        func_caller(args + 1, n - 1, std::function<void(Args...)>(
             [&args, f](Args ... a) {
                 (args[0]->get<T>().*f)(a ...);
             }));
@@ -412,19 +479,19 @@ meta& meta::function(std::string name, void (T::*f) (Args...))
     return *this;
 }
 
-inline instance meta::apply(const std::string& name, instance* i[]) const
+inline instance meta::apply(const std::string& name, instance* i[], size_t n) const
 {
     auto fi = functions.find(name);
     if(fi == functions.end())
         throw not_found_error("No such function: " + name);
     fun_type f = fi->second;
-    return f(i);
+    return f(i, n);
 }
 
 template<typename ... Args>
 instance meta::call(const std::string& name, Args&& ... args) const {
     instance* insts[sizeof...(args)] = { const_cast<instance*>(&args) ... };
-    return apply(name, insts);
+    return apply(name, insts, sizeof...(args));
 }
 
 }

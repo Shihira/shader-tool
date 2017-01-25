@@ -1,7 +1,8 @@
 #ifndef RES_TRAIT_INCLUDED
 #define RES_TRAIT_INCLUDED
 
-#include "matrix.h"
+#include <cstddef>
+#include <string>
 
 namespace shrtool {
 
@@ -9,11 +10,18 @@ template<typename T>
 struct plain_item_trait
 {
     typedef T value_type;
-    static constexpr size_t size = sizeof(value_type);
-    static constexpr size_t align = sizeof(value_type);
+    static constexpr size_t size() {
+        return sizeof(value_type);
+    }
+    static constexpr size_t align() {
+        return sizeof(value_type);
+    }
 
     static void copy(const T& v, value_type* buf) { *buf = v; }
-    static const char* glsl_type_name() { return "unknown"; }
+
+    static const char* glsl_type_name() {
+        return "unknown";
+    }
 };
 
 template<typename T>
@@ -43,51 +51,51 @@ struct item_trait<float> : plain_item_trait<float>
     static const char* glsl_type_name() { return "float"; }
 };
 
-// col-major matrix
-template<typename T, size_t M, size_t N>
-struct item_trait<math::matrix<T, M, N>>
+template<typename T, typename ... Enables>
+struct item_trait_adapter {
+};
+
+template<typename T>
+struct item_trait_adapter<T,
+    decltype(item_trait<T>::size()),
+    decltype(item_trait<T>::align())>
 {
-    typedef float value_type;
-    static constexpr size_t size = M * N * sizeof(value_type);
-    static constexpr size_t align = item_trait<math::col<value_type, M>>::align;
-
-    static void copy(const math::matrix<T, M, N>& m, value_type* buf) {
-        for(size_t n = 0; n < N; ++n, buf += M) {
-            const auto& c = m.col(n);
-            std::copy(c.begin(), c.end(), buf);
-        }
+    static size_t size(const T&) {
+        return item_trait<T>::size();
     }
-
-    static const char* glsl_type_name() {
-        static const char name_[] = {
-            'm', 'a', 't', M + '0',
-            M == N ? '\0' : 'x', N + '0', '\0' };
-        return name_;
+    static size_t align(const T&) {
+        return item_trait<T>::align();
+    }
+    static std::string glsl_type_name(const T&) {
+        return item_trait<T>::glsl_type_name();
+    }
+    static void copy(const T& c, void* buf) {
+        item_trait<T>::copy(c,
+            reinterpret_cast<typename item_trait<T>::value_type*>(buf));
     }
 };
 
-template<typename T, size_t M>
-struct item_trait<math::matrix<T, M, 1>>
+template<typename T>
+struct item_trait_adapter<T,
+    decltype(item_trait<T>::size(*(const T*)nullptr)),
+    decltype(item_trait<T>::align(*(const T*)nullptr))>
 {
-    typedef T value_type;
-    static constexpr size_t size = M * sizeof(value_type);
-    static constexpr size_t align = (M < 3 ? M : 4) * sizeof(value_type);
-
-    static void copy(const math::col<T, M>& c, value_type* buf) {
-        std::copy(c.begin(), c.end(), buf);
+    static size_t size(const T& t) {
+        return item_trait<T>::size(t);
     }
-
-    static const char* glsl_type_name() {
-        static const char name_[] = {
-            std::is_same<value_type, uint8_t>::value ? 'b' :
-            std::is_same<value_type, int>::value ? 'i' :
-            std::is_same<value_type, double>::value ? 'd' : '\0',
-            'v', 'e', 'c', M + '0', '\0' };
-        static const char* name_p = name_[0] ? name_ : name_ + 1;
-
-        return name_p;
+    static size_t align(const T& t) {
+        return item_trait<T>::align(t);
+    }
+    static std::string glsl_type_name(const T& t) {
+        return item_trait<T>::glsl_type_name(t);
+    }
+    static void copy(const T& c, void* buf) {
+        item_trait<T>::copy(c,
+            reinterpret_cast<typename item_trait<T>::value_type*>(buf));
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 struct raw_data_tag { };
 struct indirect_tag { };

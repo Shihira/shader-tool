@@ -382,6 +382,19 @@ TEST_CASE(vec_multiply) {
         col3({0, 0, 0}));
 }
 
+TEST_CASE(test_dynmatrix) {
+    dynmatrix<double> dm(4, 4, {
+        1, 2, 3, 4,
+        5, 6, 7, 8,
+        9, 8, 7, 6,
+        5, 4, 3, 2,
+    });
+
+    assert_equal_print(dm.at(1, 2), 7);
+    dm.at(3, 3) = -5;
+    assert_equal_print(dm.at(3, 3), -5);
+}
+
 int main(int argc, char* argv[])
 {
     return unit_test::test_main(argc, argv);

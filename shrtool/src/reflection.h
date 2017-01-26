@@ -10,6 +10,7 @@
 #include "singleton.h"
 #include "exception.h"
 #include "traits.h"
+#include "matrix.h"
 
 namespace shrtool {
 
@@ -96,6 +97,7 @@ struct typed_meta : meta {
         function("__size", &item_trait_adapter<T, size_t, size_t>::size);
         function("__align", &item_trait_adapter<T, size_t, size_t>::align);
         function("__raw_into", &item_trait_adapter<T, size_t, size_t>::copy);
+        function("__glsl_type_name", &item_trait_adapter<T, size_t, size_t>::glsl_type_name);
         return *this;
     }
 
@@ -173,9 +175,16 @@ struct meta_manager : generic_singleton<meta_manager> {
             .enable_clone()
             .enable_serialize();
         reg_class<double>("double")
-            .enable_clone();
+            .enable_clone()
+            .enable_serialize();
         reg_class<std::string>("string")
             .enable_clone();
+        reg_class<math::fxmat>("fmatrix")
+            .enable_clone()
+            .enable_serialize();
+        reg_class<math::dxmat>("matrix")
+            .enable_clone()
+            .enable_serialize();
 
         enable_cast<int, size_t>();
         enable_cast<int, float>();
@@ -257,6 +266,11 @@ struct instance {
         m(i.m), ptrm(i.ptrm), stor(std::move(i.stor)) { }
     instance(const instance& i) { operator=(i); }
 
+    template<typename ... Args>
+    instance call(const std::string& fn, Args&& ... args) const {
+        return get_meta().call(fn, *this, std::forward<Args>(args) ...);
+    }
+
     instance& operator=(instance&& i) {
         m = i.m;
         ptrm = i.ptrm;
@@ -271,8 +285,8 @@ struct instance {
     bool is_null() const { return !stor.get(); }
     bool is_pointer() const { return m->is_same<void*>(); }
 
-    const meta& get_meta() { return *m; }
-    const meta* get_pointer_meta() { return ptrm; }
+    const meta& get_meta() const { return *m; }
+    const meta* get_pointer_meta() const { return ptrm; }
 
     /*
      * You cannot get pointer itself through calling get (except for void*),
@@ -293,7 +307,7 @@ struct instance {
             return *reinterpret_cast<T*>(p->data);
         }
 
-        throw restriction_error("Type not match");
+        throw type_matching_error("Type not match");
     }
 
     instance cast_to(const meta& rm) const {
@@ -379,6 +393,17 @@ struct arg_type_ {
 };
 
 template<typename T>
+struct arg_type_<T&&> {
+    typedef typename std::remove_cv<T>::type pure_t;
+    pure_t&& convert(instance& t) {
+        if(t.get_meta().is_same<pure_t>()) {
+            return std::move(t.get<pure_t>());
+        } else
+            throw type_matching_error("Type not matched");
+    }
+};
+
+template<typename T>
 struct arg_type_<T*> {
     typedef typename std::remove_cv<T>::type pure_t;
     pure_t*& convert(instance& t) {
@@ -386,7 +411,7 @@ struct arg_type_<T*> {
             throw restriction_error("Not a pointer");
         const meta* ptrm = t.get_pointer_meta();
         if(!ptrm && ptrm != meta_manager::find_meta<pure_t>()) // TODO: stricter?
-            throw restriction_error("Type not matched");
+            throw type_matching_error("Type not matched");
 
         return *reinterpret_cast<pure_t**>(&t.get<void*>());
     }
@@ -419,11 +444,11 @@ inline RetType func_caller(instance* args[], size_t n,
         throw restriction_error("Number of arguments does not match");
 
     arg_type_<Head> cur_arg;
-    Head& h = cur_arg.convert(*args[0]);
 
     return func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
             [&](Args ... rest) -> RetType {
-                return f(h, rest ...);
+                return f(std::forward<Head>(cur_arg.convert(*args[0])),
+                        std::forward<Args>(rest) ...);
             }));
 }
 
@@ -458,7 +483,7 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...))
         return ret_type_<RetType>::convert(
             func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
                 [&args, f](Args ... a) -> RetType {
-                    return (args[0]->get<T>().*f)(a ...);
+                    return (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
                 })));
     };
 
@@ -471,7 +496,7 @@ meta& meta::function(std::string name, void (T::*f) (Args...))
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         func_caller(args + 1, n - 1, std::function<void(Args...)>(
             [&args, f](Args ... a) {
-                (args[0]->get<T>().*f)(a ...);
+                (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
             }));
         return instance();
     };
@@ -490,7 +515,7 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
 
 template<typename ... Args>
 instance meta::call(const std::string& name, Args&& ... args) const {
-    instance* insts[sizeof...(args)] = { const_cast<instance*>(&args) ... };
+    instance* insts[sizeof...(args)] = { &const_cast<instance&>(args) ... };
     return apply(name, insts, sizeof...(args));
 }
 

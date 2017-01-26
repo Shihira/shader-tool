@@ -87,22 +87,23 @@ TEST_CASE(test_provided_universal_property) {
 }
 
 TEST_CASE(test_provided_dynamic_property) {
+    refl::meta_manager::init();
     dynamic_property dp;
 
-    dp.get<math::matrix<float, 4, 3>>(0) = math::matrix<float, 4, 3> {
+    dp.append<math::fxmat>(math::fxmat(4, 3, {
         12, 64, 23,
         45, 31, 63,
         75, 29, 73,
         3,  90, 15,
-    };
-    dp.get<math::fcol3>(1) = math::fcol3{ 1.1, 2, 3.3 };
-    dp.get<int>(2) = 4;
-    dp.get<math::fcol3>(3) = math::fcol3{ 5.5, 6.6, 7 };
-    dp.get<char>(4) = 'S';
-    dp.get<char>(5) = 'H';
-    dp.get<char>(6) = 'R';
-    dp.get<math::col3>(7) = math::col3{ 10, 11, 12 };
-    dp.get<double>(8) = 3.14159;
+    }));
+    dp.append<math::fxmat>(math::fxmat(3, 1, { 1.1, 2, 3.3 }));
+    dp.append<int>(4);
+    dp.append<math::fxmat>(math::fxmat(3, 1, { 5.5, 6.6, 7 }));
+    dp.append<char>('S');
+    dp.append<char>('H');
+    dp.append<char>('R');
+    dp.append<math::dxmat>(math::dxmat(3, 1, {10, 11, 12}));
+    dp.append<double>(3.14159);
 
     typedef provider<dynamic_property, property_buffer> prov;
     auto p = prov::load(dp);

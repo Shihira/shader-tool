@@ -782,24 +782,24 @@ struct dynmatrix {
     typedef T value_type;
 
     dynmatrix() { }
-    dynmatrix(size_t cols, size_t rows) {
-        assign(cols, rows);
+    dynmatrix(size_t rows, size_t cols) {
+        assign(rows, cols);
     }
-    dynmatrix(size_t cols, size_t rows,
+    dynmatrix(size_t rows, size_t cols,
             const std::initializer_list<value_type>& d) {
-        assign(cols, rows);
+        assign(rows, cols);
         std::copy(d.begin(), d.end(), data_);
     }
     dynmatrix(const dynmatrix& d) {
-        assign(d.cols_, d.rows_);
-        std::copy(d.data_, d.data_ + d.elem_count, data_);
+        assign(d.rows_, d.cols_);
+        std::copy(d.data_, d.data_ + d.elem_count(), data_);
     }
     dynmatrix(dynmatrix&& d) :
-        cols_(d.cols_), rows_(d.rows_) {
+        rows_(d.rows_), cols_(d.cols_) {
         std::swap(d.data_, data_);
     }
 
-    void assign(size_t cols, size_t rows) {
+    void assign(size_t rows, size_t cols) {
         if(data_) delete[] data_;
         cols_ = cols;
         rows_ = rows;
@@ -811,24 +811,31 @@ struct dynmatrix {
     }
 
     value_type* data() { return data_; }
+    const value_type* data() const { return data_; }
     value_type& at(size_t r, size_t c) {
-        return data_[r * rows_ + c];
+        return data_[r * cols_ + c];
+    }
+    const value_type& at(size_t r, size_t c) const {
+        return data_[r * cols_ + c];
     }
 
     operator bool() const {
         return data_;
     }
 
-    size_t cols() { return cols_; }
-    size_t rows() { return rows_; }
-    size_t elem_count() { return cols_ * rows_; }
+    size_t rows() const { return rows_; }
+    size_t cols() const { return cols_; }
+    size_t elem_count() const { return cols_ * rows_; }
 
 private:
-    size_t cols_ = 0;
     size_t rows_ = 0;
+    size_t cols_ = 0;
 
     value_type* data_ = nullptr;
 };
+
+typedef dynmatrix<float> fxmat;
+typedef dynmatrix<double> dxmat;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1005,14 +1012,25 @@ struct item_trait<math::dynmatrix<T>>
         return sizeof(value_type) * (r < 3 ? r : 4);
     }
     static void copy(const math::dynmatrix<T>& m, value_type* buf) {
-        std::copy(m.data(), m.data() + m.elem_count(), buf);
+        for(size_t i = 0; i < m.cols(); i++) {
+            for(size_t j = 0; j < m.rows(); j++) {
+                *(buf++) = m.at(j, i);
+            }
+        }
     }
     static std::string glsl_type_name(const math::dynmatrix<T>& m) {
+        const char* tc =
+            std::is_same<value_type, uint8_t>::value ? "b" :
+            std::is_same<value_type, int>::value ? "i" :
+            std::is_same<value_type, double>::value ? "d" : "";
+
         if(m.cols() == 1) {
-            return std::string("vec") + std::to_string(m.rows());
+            return std::string(tc) +
+                std::string("vec") + std::to_string(m.rows());
         } else {
-            return std::string("mat") + std::to_string(m.rows()) +
-                "x" + std::to_string(m.cols);
+            return std::string(tc) +
+                std::string("mat") + std::to_string(m.rows()) +
+                "x" + std::to_string(m.cols());
         }
     }
 };

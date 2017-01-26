@@ -238,113 +238,48 @@ public:
     }
 };
 
+}
+
 ////////////////////////////////////////////////////////////////////////////////
+#include "reflection.h"
 
-struct dynamic_property_storage_base {
-    virtual const char* glsl_type_name() const = 0;
-    virtual void copy(uint8_t* data) const = 0;
-    virtual size_t align(size_t start_at) const = 0;
-    virtual size_t size() const = 0;
-    virtual ~dynamic_property_storage_base() { }
-};
-
-template<typename T>
-struct dynamic_property_storage : dynamic_property_storage_base {
-    typedef item_trait<T> trait;
-    typedef T value_type;
-
-    value_type v;
-
-    virtual const char* glsl_type_name() const override {
-        return trait::glsl_type_name();
-    }
-
-    virtual void copy(uint8_t* data) const override {
-        trait::copy(v, reinterpret_cast<typename trait::value_type*>(data));
-    }
-
-    virtual size_t align(size_t start_at) const override {
-        return start_at % trait::align() ?
-            (start_at / trait::align() + 1) * trait::align() : start_at;
-    }
-
-    virtual size_t size() const override {
-        return trait::size();
-    }
-
-    ~dynamic_property_storage() override { }
-
-    template<typename ...Args>
-    dynamic_property_storage(Args ...args) : v(std::forward(args)...) { }
-};
+namespace shrtool {
 
 struct dynamic_property {
-protected:
-    std::vector<std::unique_ptr<dynamic_property_storage_base>> storage_;
-    bool type_hint_;
-
-    // offset cache
-    mutable std::vector<size_t> offsets_;
-    mutable size_t size_in_bytes_ = 0;
-    mutable bool item_type_updated_ = false;
-
-    bool changed_ = true;
-
-    void update_offsets_() const {
-        if(!item_type_updated_) return;
-
-        offsets_.resize(storage_.size());
-        size_t align = 0, i = 0;
-        for(const auto& p : storage_) {
-            if(!p) { offsets_[i] = align; continue; }
-            align = p->align(align);
-            offsets_[i] = align;
-            align += p->size();
-
-            i += 1;
-        }
-
-        size_in_bytes_ = align;
-        item_type_updated_ = false;
+    template<typename T>
+    void append(T&& obj) {
+        storage.push_back(refl::instance::make(std::move(obj)));
+        if(!storage.back().get_meta().has_function("__raw_into"))
+            throw restriction_error("Not serializable.");
     }
 
-public:
-    void force_offset_update() { item_type_updated_ = true; }
-
-    void type_hint_enabled(bool b) { type_hint_ = b; }
-    bool type_hint_enabled() const { return type_hint_; }
-
-    size_t offset(size_t i) {
-        update_offsets_();
-        return offsets_[i];
+    template<typename T>
+    T& get(size_t idx) {
+        if(idx >= storage.size())
+            throw restriction_error("Index out of range");
+        return storage[idx].get<T>();
     }
 
-    size_t size() const {
-        return storage_.size();
-    }
-
-    size_t size_in_bytes() const {
-        update_offsets_();
-        return size_in_bytes_;
-    }
-
-    void copy(uint8_t* data) const {
-        update_offsets_();
-        size_t i = 0;
-        for(const auto& p : storage_) {
-            if(p) p->copy(data + offsets_[i]);
-            i += 1;
-        }
+    template<typename T>
+    void set(size_t idx, T&& obj) {
+        if(idx >= storage.size())
+            throw restriction_error("Index out of range");
+        storage[idx] = refl::instance::make(std::move(obj));
+        if(!storage[idx].get_meta().has_function("__raw_into"))
+            throw restriction_error("Not serializable.");
     }
 
     std::string definition(const std::string& name,
-            std::initializer_list<std::string> l) {
+            std::vector<std::string> l) {
         int i = 0;
         std::string def = "uniform " + name + " {\n";
         for(const std::string& s : l) {
-            if(!storage_[i]) { i += 1; continue; }
+            if(storage[i].is_null()) {
+                i += 1; continue;
+            }
+
             def += "    ";
-            def += storage_[i]->glsl_type_name();
+            def += storage[i].call("__glsl_type_name").get<std::string>();
             def += " " + s + ";\n";
             i += 1;
         }
@@ -353,77 +288,65 @@ public:
         return def;
     }
 
-    template<typename T>
-    T& get(size_t i) {
-        if(storage_.size() < i + 1) {
-            storage_.resize(i + 1);
-        }
-
-        dynamic_property_storage<T>* p = nullptr;
-        if(storage_[i]) {
-            if(type_hint_) {
-                if(item_trait<T>::glsl_type_name() !=
-                        std::string(storage_[i]->glsl_type_name()))
-                    throw type_matching_error("Type not matched");
-                p = dynamic_cast<dynamic_property_storage<T>*>(
-                        storage_[i].get());
-            }
-
-            p = reinterpret_cast<dynamic_property_storage<T>*>(
-                    storage_[i].get());
-        } else {
-            p = new dynamic_property_storage<T>();
-            storage_[i].reset(p);
-            item_type_updated_ = true;
-        }
-
-        return p->v;
+    size_t size_in_bytes() const {
+        update_offsets_();
+        return offsets_.back() +
+            storage.back().call("__size").get<size_t>();
     }
 
+    size_t size() const {
+        return storage.size();
+    }
+
+    void copy(uint8_t* buf) const {
+        update_offsets_();
+        uint8_t* off = buf;
+        for(size_t i = 0; i < storage.size(); i++) {
+            off = buf + offsets_[i];
+            storage[i].call("__raw_into", refl::instance::make((void*)off));
+        }
+    }
+
+    bool is_changed() const { return is_changed_; }
+    void mark_applied() { is_changed_ = false; }
+
     dynamic_property& operator!() {
-        changed_ = true;
+        is_changed_ = true;
         return *this;
     }
 
-    bool is_changed() const { return changed_; }
-    void mark_applied() { changed_ = false; }
+protected:
+    void update_offsets_() const {
+        if(!offset_changed_) return;
 
-    template<typename T>
-    T& set(size_t i, const T& t) {
-        return (!*this).get<T>(i) = t;
-    }
+        size_t cur_off = 0;
+        int i = 0;
+        offsets_.resize(size());
 
-    template<typename T>
-    T& set(size_t i, T&& t) {
-        return (!*this).get<T>(i) = std::move(t);
-    }
+        for(const refl::instance& ins : storage) {
+            if(ins.is_null()) {
+                offsets_[i] = cur_off;
+                i += 1; continue;
+            }
 
-    template<typename T>
-    const T& get(size_t i) const {
-        if(storage_.size() < i + 1)
-            throw restriction_error("Index exceeds");
-        if(!storage_[i])
-            throw restriction_error("Not initialized");
+            size_t align = ins.call("__align").get<size_t>();
+            size_t sz = ins.call("__size").get<size_t>();
+            cur_off = cur_off % align == 0 ? cur_off :
+                (cur_off / align + 1) * align;
+            offsets_[i] = cur_off;
 
-        dynamic_property_storage<T>* p = nullptr;
-        if(type_hint_) {
-            if(item_trait<T>::glsl_type_name !=
-                    std::string(storage_[i]->glsl_type_name()))
-                throw type_matching_error("Type not matched");
-            p = dynamic_cast<dynamic_property_storage<T>*>(
-                    storage_[i].get());
+            cur_off += sz;
+            i += 1;
         }
 
-        p = reinterpret_cast<dynamic_property_storage<T>*>(
-                storage_[i].get());
-
-        return p->v;
+        offset_changed_ = false;
     }
 
-    void erase(size_t i) {
-        if(i < storage_.size())
-            storage_[i].reset(nullptr);
-    }
+    std::vector<refl::instance> storage;
+
+    mutable std::vector<size_t> offsets_;
+    mutable bool offset_changed_ = true;
+    bool is_changed_ = true;
 };
 
 template<>

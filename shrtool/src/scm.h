@@ -19,6 +19,7 @@ struct scm_item_trait {
     static const scm_item_trait* query_trait(SCM obj);
 };
 
+/*
 template<>
 struct dynamic_property_storage<SCM> : dynamic_property_storage_base {
     dynamic_property_storage(SCM v) :
@@ -54,6 +55,7 @@ private:
     const scm_item_trait* t_;
     SCM value_ = nullptr;
 };
+*/
 
 namespace scm {
 

@@ -116,17 +116,19 @@ TEST_CASE(test_universal_property_multiple)
 }
 
 TEST_CASE(test_dynamic_property) {
+    refl::meta_manager::init();
+
     dynamic_property dp;
 
-    dp.get<math::matrix<float, 4, 3>>(0);
-    dp.get<math::fcol3>(1);
-    dp.get<int>(2);
-    dp.get<math::fcol3>(3);
-    dp.get<char>(4) = 'a';
-    dp.get<char>(5) = 'b';
-    dp.get<char>(6);
-    dp.get<math::col3>(7);
-    dp.get<double>(8) = 19.879;
+    dp.append<math::fxmat>(math::fxmat(4, 3));
+    dp.append<math::fxmat>(math::fxmat(3, 1));
+    dp.append<int>(2);
+    dp.append<math::fxmat>(math::fxmat(3, 1));
+    dp.append<char>('a');
+    dp.append<char>('b');
+    dp.append<char>('c');
+    dp.append<math::dxmat>(math::dxmat(3, 1));
+    dp.append<double>(19.879);
 
     assert_equal_print(dp.size(), 9U);
     assert_equal_print(dp.size_in_bytes(), 128U);
@@ -151,11 +153,15 @@ TEST_CASE(test_dynamic_property) {
                 double jam;
             };)EOF"));
 
-    dp.type_hint_enabled(true);
     assert_equal_print(dp.get<char>(4), 'a');
     assert_equal_print(dp.get<char>(5), 'b');
     assert_equal_print(dp.get<double>(8), 19.879);
     assert_except(dp.get<char>(8), type_matching_error);
+
+    uint8_t buf[128] = {0};
+    dp.copy(buf);
+    assert_equal_print(buf[76], 'a');
+    assert_equal_print(*(int*)(buf + 60), 2);
 }
 
 int main(int argc, char* argv[])

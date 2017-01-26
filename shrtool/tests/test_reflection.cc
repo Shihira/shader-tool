@@ -111,6 +111,7 @@ TEST_CASE(test_serialization)
 struct member_func_class {
     int a = 0;
     float b = 0;
+    std::string s;
 public:
     member_func_class() = default;
     member_func_class(member_func_class&& o) = default;
@@ -119,13 +120,18 @@ public:
     float multiply() { return a * b; }
     void set_a(int a_) { a = a_; }
     void set_b(float b_) { b = b_; }
+    void set_s(const string& s_) { s = s_; }
+    std::string get_s() { return s; }
+    void set_move_s(string&& s_) { s = std::move(s_); }
 
     static void meta_reg_() {
         meta_manager::reg_class<member_func_class>("member_func_class")
             .enable_clone()
             .function("multiply", &member_func_class::multiply)
             .function("set_a", &member_func_class::set_a)
-            .function("set_b", &member_func_class::set_b);
+            .function("set_b", &member_func_class::set_b)
+            .function("set_s", &member_func_class::set_s)
+            .function("set_move_s", &member_func_class::set_move_s);
     }
 };
 
@@ -136,7 +142,7 @@ TEST_CASE(test_member_function)
 
     instance ins = instance::make(member_func_class());
     ins.get_meta().call("set_a", ins, instance::make(7));
-    ins.get_meta().call("set_b", ins, instance::make(8.2f));
+    ins.call("set_b", instance::make(8.2f));
     instance res_1 = ins.get_meta().call("multiply", ins);
     assert_float_equal(res_1.get<float>(), 57.4f);
 }
@@ -147,12 +153,28 @@ TEST_CASE(test_clone)
     member_func_class::meta_reg_();
 
     instance ins = instance::make(member_func_class());
-    ins.get_meta().call("set_a", ins, instance::make(7));
-    ins.get_meta().call("set_b", ins, instance::make(8));
+    ins.call("set_a", instance::make(7));
+    ins.call("set_b", instance::make(8));
     instance ins2 = ins;
     assert_equal_print(ins2.get<member_func_class>().multiply(), 56);
     assert_true(&ins.get<member_func_class>()
             != &ins2.get<member_func_class>());
+}
+
+TEST_CASE(test_move)
+{
+    meta_manager::init();
+    member_func_class::meta_reg_();
+
+    instance ins = instance::make(member_func_class());
+    instance s1 = instance::make(string("god bless my program"));
+    instance s2 = instance::make(string("hello world"));
+    ins.call("set_s", s1);
+    assert_equal_print(ins.get<member_func_class>().get_s(),
+            "god bless my program");
+
+    ins.call("set_move_s", s2);
+    assert_true(s2.get<string>() != "hello world");
 }
 
 int main(int argc, char* argv[])

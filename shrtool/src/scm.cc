@@ -1,8 +1,8 @@
 #include <unordered_map>
 #include <fstream>
+#include <sstream>
 
 #include "scm.h"
-#include "mesh.h"
 
 #define sym_equ(s, str) scm_is_eq((s), scm_from_latin1_symbol(str))
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
@@ -12,47 +12,11 @@
 
 namespace shrtool {
 
-////////////////////////////////////////////////////////////////////////////////
-// scm_item_trait
-
-struct scm_item_trait_unknown : scm_item_trait {
-    const char* glsl_type_name(SCM obj) const override { return ""; }
-    void copy(SCM obj, uint8_t* data) const override { }
-    size_t align(SCM obj) const override { return 0; }
-    size_t size(SCM obj) const override { return 0; }
-};
-
-struct scm_item_trait_int : scm_item_trait {
-    const char* glsl_type_name(SCM obj) const override { return "int"; }
-    void copy(SCM obj, uint8_t* data) const override {
-        *reinterpret_cast<int*>(data) = scm_to_int(obj);
-    }
-    size_t align(SCM obj) const override {
-        return sizeof(int);
-    }
-    size_t size(SCM obj) const override {
-        return sizeof(int);
-    }
-};
-
-const scm_item_trait* scm_item_trait::query_trait(SCM obj) {
-    if(SCM_NUMBERP(obj)) {
-        static scm_item_trait_int t;
-        return &t;
-    }
-
-    static scm_item_trait_unknown ut;
-    return &ut;
-}
+using namespace refl;
 
 namespace scm {
 
-static scm_t_bits shader_type;
-static scm_t_bits model_type;
-static res_pool scm_obj_pool;
-static std::unordered_map<std::string, SCM> scm_pool;
-
-res_pool& get_pool() { return scm_obj_pool; }
+static scm_t_bits instance_type = 0;
 
 DEF_ENUM_MAP(em_scm_sym_type_name__, std::string, layout::item_type, ({
         { "color", layout::COLOR },
@@ -66,217 +30,166 @@ DEF_ENUM_MAP(em_scm_sym_type_name__, std::string, layout::item_type, ({
         { "texcubemap", layout::TEXCUBEMAP },
     }))
 
-void init_scm()
+DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
+        { "vertex", shader::VERTEX },
+        { "fragment", shader::FRAGMENT },
+        { "geometry", shader::GEOMETRY },
+    }))
+
+SCM instance_to_scm(instance&& ins)
 {
-    // register shader type
-    shader_type = scm_make_smob_type("shader", 0);
-    scm_set_smob_free(shader_type, free_shader);
-    scm_set_smob_print(shader_type, print_shader);
-    scm_set_smob_equalp(shader_type, equalp_shader);
-
-    // register model type
-    model_type = scm_make_smob_type("model", 0);
-    scm_set_smob_free(model_type, free_model);
-    scm_set_smob_print(model_type, print_model);
-    scm_set_smob_equalp(model_type, equalp_model);
-
-    scm_c_define_gsubr("shader-source", 2, 0, 0, (void*)shader_source);
-    scm_c_define_gsubr("make-shader", 2, 0, 0, (void*)make_shader);
-    scm_c_define_gsubr("find-obj-by-name", 1, 0, 0, (void*)find_obj_by_name);
-    scm_c_define_gsubr("get-obj-name", 1, 0, 0, (void*)get_obj_name);
-}
-
-template<typename T>
-SCM make_smob_from_weak_ref(std::weak_ptr<T> w)
-{
-    scm_t_bits data_stor[3];
-
-    // in most cases it passes
-    static_assert(
-        sizeof(data_stor) > sizeof(std::weak_ptr<T>),
-        "unable to store a weak_ptr in Smob");
-
-    new (data_stor) std::weak_ptr<T>(std::move(w));
-
-    SCM o = scm_new_double_smob(shader_type,
-            data_stor[0], data_stor[1], data_stor[2]);
-
-    return o;
-}
-
-template<typename T>
-void delete_weak_ref_made_smob(SCM o)
-{
-    typedef std::weak_ptr<T> weak_ptr_T;
-    scm_t_bits data_stor[3];
-
-    data_stor[0] = SCM_SMOB_DATA_1(o);
-    data_stor[1] = SCM_SMOB_DATA_2(o);
-    data_stor[2] = SCM_SMOB_DATA_3(o);
-
-    auto* p = reinterpret_cast<std::weak_ptr<T>*>(data_stor);
-    p->~weak_ptr_T();
-}
-
-template<typename T>
-std::weak_ptr<T> smob_to_weak_ref(SCM o)
-{
-    scm_t_bits data_stor[3];
-
-    data_stor[0] = SCM_SMOB_DATA_1(o);
-    data_stor[1] = SCM_SMOB_DATA_2(o);
-    data_stor[2] = SCM_SMOB_DATA_3(o);
-
-    auto& p = *reinterpret_cast<std::weak_ptr<T>*>(data_stor);
-
-    return p;
-}
-
-SCM find_obj_by_name(SCM name)
-{
-    scm_bith(string, name, 1);
-
-    const char* n = scm_to_latin1_string(name);
-
-    auto p = scm_pool.find(n);
-    if(p == scm_pool.end())
-        return SCM_ELISP_NIL;
-    return p->second;
-}
-
-SCM get_obj_name(SCM o)
-{
-    if(SCM_SMOB_PREDICATE(shader_type, o)) {
-        auto ref = smob_to_weak_ref<res_pool::stor_type<shader_info>>(o);
-        return scm_from_latin1_string(ref.lock()->name.c_str());
+    const meta& m = ins.get_meta();
+    if(m.is_same<bool>())
+        return scm_from_bool(ins.get<bool>());
+    if(m.is_same<int>())
+        return scm_from_int(ins.get<int>());
+    if(m.is_same<size_t>())
+        return scm_from_size_t(ins.get<size_t>());
+    if(m.is_same<float>())
+        return scm_from_double(ins.get<float>());
+    if(m.is_same<double>())
+        return scm_from_double(ins.get<float>());
+    if(m.is_same<char>())
+        return scm_from_char(ins.get<char>());
+    if(m.is_same<std::string>()) {
+        std::string& s = ins.get<std::string>();
+        return scm_from_latin1_stringn(s.c_str(), s.size());
     }
 
-    return scm_from_latin1_string("");
+    return make_instance_scm(std::move(ins));
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// shader
-
-SCM make_shader(SCM nm, SCM lst)
+instance scm_to_instance(SCM s)
 {
-    scm_bith(string, nm, 1);
-    scm_bith(list, nm, 2);
+    if(SCM_SMOB_PREDICATE(instance_type, s))
+        return std::move(*(instance*)SCM_SMOB_DATA(s));
+    if(scm_is_bool(s))
+        return instance::make<bool>(scm_to_bool(s));
+    if(scm_is_integer(s))
+        return instance::make<int>(scm_to_int(s));
+    if(scm_is_real(s))
+        return instance::make<float>(scm_to_double(s));
+    if(scm_is_string(s))
+        return instance::make<std::string>(scm_to_latin1_string(s));
+    if(scm_is_symbol(s))
+        return instance::make<size_t>(em_scm_enum_tranform__(
+            scm_to_latin1_string(scm_symbol_to_string(s))));
 
-    const char* s_nm = scm_to_latin1_string(nm);
-    shader_info si;
-    parse_shader_from_scm(lst, si);
-
-    scm_obj_pool.insert<shader_info>(s_nm, std::move(si));
-    SCM scm =  make_smob_from_weak_ref(scm_obj_pool.ref<shader_info>(s_nm));
-    scm_pool[s_nm] = scm;
-
-    return scm;
+    return instance::make<scm_t>(scm_t(s));
 }
 
-size_t free_shader(SCM m)
+std::vector<std::tuple<std::string, std::string, std::string>>
+func_info {
+    { "shader-source", "shader", "make_source" },
+    { "make-shader", "builtin", "make_shader" },
+};
+
+SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
 {
-    delete_weak_ref_made_smob<res_pool::stor_type<shader_info>>(m);
+    std::vector<instance> args;
+
+    while(scm_is_pair(scm_args)) {
+        instance i = scm_to_instance(scm_car(scm_args));
+        args.emplace_back(std::move(i));
+        scm_args = scm_cdr(scm_args);
+    }
+
+    std::vector<instance*> args_ptr;
+    for(instance& i : args)
+        args_ptr.push_back(&i);
+
+    meta& m = meta_manager::get_meta(scm_to_latin1_string(typenm));
+    instance ins = m.apply(scm_to_latin1_string(funcnm),
+            args_ptr.data(), args_ptr.size());
+    return instance_to_scm(std::move(ins));
+}
+
+void register_function(
+        const std::string& func,
+        const std::string& typenm,
+        const std::string& funcnm)
+{
+    scm_c_define_gsubr("general-subroutine",
+            3, 0, 0, (void*)general_subroutine);
+
+    /*
+     * (define FUNC
+     *   (lambda args
+     *     (general-subroutine TYPENM FUNCNM args))
+     */
+
+    scm_eval(SCM_LIST3(
+            scm_from_latin1_symbol("define"),
+            scm_from_latin1_symbol(func.c_str()),
+            SCM_LIST3(
+                scm_from_latin1_symbol("lambda"),
+                scm_from_latin1_symbol("args"),
+                SCM_LIST4(
+                    scm_from_latin1_symbol("general-subroutine"),
+                    scm_from_latin1_string(typenm.c_str()),
+                    scm_from_latin1_string(funcnm.c_str()),
+                    scm_from_latin1_symbol("args")))),
+        scm_interaction_environment());
+}
+
+void init_scm()
+{
+    instance_type = scm_make_smob_type("instance", 0);
+    scm_set_smob_free(instance_type, free_instance_scm);
+    scm_set_smob_print(instance_type, print_instance_scm);
+    scm_set_smob_equalp(instance_type, equalp_instance_scm);
+
+    scm_t::meta_reg_();
+    builtin::meta_reg_();
+    shader_info::meta_reg();
+
+    for(auto& f : func_info)
+        register_function(std::get<0>(f), std::get<1>(f), std::get<2>(f));
+}
+
+SCM make_instance_scm(instance&& ins)
+{
+    instance* pins = new instance(std::move(ins));
+    static_assert(sizeof(pins) <= sizeof(scm_t_bits),
+            "SMOB cannot contain a pointer");
+    return scm_new_smob(instance_type, (scm_t_bits)pins);
+}
+
+size_t free_instance_scm(SCM ins)
+{
+    instance* pins = (instance*)SCM_SMOB_DATA(ins);
+    if(pins) delete pins;
+    SCM_SET_SMOB_DATA(ins, 0);
     return 0;
 }
 
-SCM equalp_shader(SCM m1, SCM m2)
+SCM equalp_instance_scm(SCM a, SCM b)
 {
-    auto p1 = smob_to_weak_ref<res_pool::stor_type<shader_info>>(m1);
-    auto p2 = smob_to_weak_ref<res_pool::stor_type<shader_info>>(m2);
-    if(p1.expired() || p2.expired()) return SCM_BOOL_F;
-    if(p1.lock()->name == p2.lock()->name) return SCM_BOOL_T;
-    else return SCM_BOOL_F;
+    instance* pa = (instance*)SCM_SMOB_DATA(a);
+    instance* pb = (instance*)SCM_SMOB_DATA(b);
+    if(pa->get_meta() != pb->get_meta())
+        return SCM_BOOL_F;
+    if(!pa->get_meta().has_function("__equal"))
+        return pa == pb ? SCM_BOOL_T : SCM_BOOL_F;
+
+    return scm_from_bool(pa->call("__equal", *pb).get<bool>());
 }
 
-int print_shader(SCM m, SCM port, scm_print_state* pstate)
+int print_instance_scm(SCM ins, SCM port, scm_print_state* pstate)
 {
-    auto wp = smob_to_weak_ref<res_pool::stor_type<shader_info>>(m);
-    std::string prn;
-    if(!wp.expired()) {
-        auto p = wp.lock();
-        prn = "#<shader " + p->name + ">";
-    } else
-        prn = "#<shader INVALID!>";
+    instance* pi = (instance*)SCM_SMOB_DATA(ins);
 
-    scm_c_write(port, prn.c_str(), prn.size());
+    std::stringstream prn;
+    if(!pi->get_meta().has_function("__print")) {
+         prn << "#<instance " << pi->get_meta().name() << ' ' << pi << ">";
+    } else {
+        prn << "#<instance " << pi->get_meta().name() << ' ' <<
+            pi->call("__print").get<std::string>() + ">";
+    }
+
+    scm_c_write(port, prn.str().c_str(), prn.str().size());
 
     return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// model
-
-typedef std::vector<mesh_indexed> meshes_type;
-
-SCM make_model(SCM nm, SCM filename)
-{
-    scm_bith(string, nm, 1);
-    scm_bith(string, nm, 2);
-
-    const char* s_nm = scm_to_latin1_string(nm);
-    const char* s_fn = scm_to_latin1_string(nm);
-
-    std::ifstream file(s_fn);
-    meshes_type mesh = mesh_io_object::load(file);
-
-    scm_obj_pool.insert<meshes_type>(s_nm, std::move(mesh));
-    SCM scm =  make_smob_from_weak_ref(scm_obj_pool.ref<meshes_type>(s_nm));
-    scm_pool[s_nm] = scm;
-
-    return scm;
-}
-
-size_t free_model(SCM shdr)
-{
-    delete_weak_ref_made_smob<res_pool::stor_type<meshes_type>>(shdr);
-    return 0;
-}
-
-SCM equalp_model(SCM shdr1, SCM shdr2)
-{
-    auto p1 = smob_to_weak_ref<res_pool::stor_type<meshes_type>>(shdr1);
-    auto p2 = smob_to_weak_ref<res_pool::stor_type<meshes_type>>(shdr2);
-    if(p1.expired() || p2.expired()) return SCM_BOOL_F;
-    if(p1.lock()->name == p2.lock()->name) return SCM_BOOL_T;
-    else return SCM_BOOL_F;
-}
-
-int print_model(SCM shdr, SCM port, scm_print_state* pstate)
-{
-    auto wp = smob_to_weak_ref<res_pool::stor_type<meshes_type>>(shdr);
-    std::string prn;
-    if(!wp.expired()) {
-        auto p = wp.lock();
-        prn = "#<model " + p->name + ">";
-    } else
-        prn = "#<model INVALID!>";
-
-    scm_c_write(port, prn.c_str(), prn.size());
-
-    return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// misc.
-
-SCM shader_source(SCM shdr, SCM tag)
-{
-    scm_assert_smob_type(shader_type, shdr);
-    scm_bith(symbol, tag, 2);
-
-    auto wp = smob_to_weak_ref<res_pool::stor_type<shader_info>>(shdr);
-    auto p = wp.lock();
-    sub_shader_info* ss = nullptr;
-
-    if(sym_equ(tag, "vertex"))
-        ss = p->data.get_sub_shader_by_type(shader::VERTEX);
-    if(sym_equ(tag, "fragment"))
-        ss = p->data.get_sub_shader_by_type(shader::FRAGMENT);
-    if(sym_equ(tag, "geometry"))
-        ss = p->data.get_sub_shader_by_type(shader::GEOMETRY);
-
-    if(ss) return scm_from_latin1_string(ss->make_source(*p).c_str());
-    return scm_from_latin1_string("");
 }
 
 void parse_layout(SCM layout_list, std::vector<layout::type_name_pair>& l)
@@ -294,8 +207,10 @@ void parse_layout(SCM layout_list, std::vector<layout::type_name_pair>& l)
     }
 }
 
-void parse_shader_from_scm(SCM shader_list, shader_info& s)
+void builtin::parse_shader_from_scm(
+        scm_t shader_list_, shader_info& s)
 {
+    SCM shader_list = shader_list_.scm;
     if(scm_is_false(scm_list_p(shader_list)))
         throw unsupported_error("Shader is not a proper list.");
 

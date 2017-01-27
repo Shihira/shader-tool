@@ -7,6 +7,7 @@
 
 #include "shading.h" 
 #include "providers.h"
+#include "reflection.h"
 #include "traits.h"
 
 namespace shrtool {
@@ -77,6 +78,17 @@ struct shader_info {
 
     const sub_shader_info* get_sub_shader_by_type(shader::shader_type t) const;
     sub_shader_info* get_sub_shader_by_type(shader::shader_type t);
+
+    std::string make_source(shader::shader_type t) const {
+        auto* s = get_sub_shader_by_type(t);
+        if(!s) return "";
+        return s->make_source(*this);
+    }
+
+    static void meta_reg() {
+        refl::meta_manager::reg_class<shader_info>("shader")
+            .function("make_source", &shader_info::make_source);
+    }
 };
 
 struct shader_parser {

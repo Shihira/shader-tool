@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <typeinfo>
+#include <sstream>
 
 #include "singleton.h"
 #include "exception.h"
@@ -53,6 +54,10 @@ public:
     meta& function(std::string name, RetType (T::*f) (Args...));
     template<typename T, typename ... Args>
     meta& function(std::string name, void (T::*f) (Args...));
+    template<typename T, typename RetType, typename ... Args>
+    meta& function(std::string name, RetType (T::*f) (Args...) const);
+    template<typename T, typename ... Args>
+    meta& function(std::string name, void (T::*f) (Args...) const);
 
     template<typename T>
     bool is_same() const {
@@ -93,6 +98,18 @@ struct typed_meta : meta {
     }
 
     template<bool Enable = true>
+    typed_meta& enable_equal() {
+        function("__equal", &equal_<Enable>);
+        return *this;
+    }
+
+    template<bool Enable = true>
+    typed_meta& enable_print() {
+        function("__print", &print_<Enable>);
+        return *this;
+    }
+
+    template<bool Enable = true>
     typed_meta& enable_serialize() {
         function("__size", &item_trait_adapter<T, size_t, size_t>::size);
         function("__align", &item_trait_adapter<T, size_t, size_t>::align);
@@ -108,6 +125,18 @@ private:
     template<bool Enable = true>
     static T clone_(const T& o) {
         return o;
+    }
+
+    template<bool Enable = true>
+    static bool equal_(const T& a, const T& b) {
+        return a == b;
+    }
+
+    template<bool Enable = true>
+    static std::string print_(const T& o) {
+        std::stringstream ss;
+        ss << o;
+        return ss.str();
     }
 };
 
@@ -160,24 +189,42 @@ struct meta_manager : generic_singleton<meta_manager> {
     static void init() {
         clear();
 
+        reg_class<bool>("bool")
+            .enable_clone()
+            .enable_equal()
+            .enable_print();
         reg_class<char>("byte")
             .enable_clone()
+            .enable_equal()
+            .enable_print()
             .enable_serialize();
         reg_class<int>("int")
             .enable_clone()
+            .enable_equal()
+            .enable_print()
             .enable_serialize();
         reg_class<size_t>("uint")
             .enable_clone()
+            .enable_equal()
+            .enable_print()
             .enable_serialize();
         reg_class<void*>("pointer")
+            .enable_equal()
+            .enable_print()
             .enable_clone();
         reg_class<float>("float")
+            .enable_equal()
+            .enable_print()
             .enable_clone()
             .enable_serialize();
         reg_class<double>("double")
+            .enable_equal()
+            .enable_print()
             .enable_clone()
             .enable_serialize();
         reg_class<std::string>("string")
+            .enable_equal()
+            .enable_print()
             .enable_clone();
         reg_class<math::fxmat>("fmatrix")
             .enable_clone()
@@ -233,7 +280,7 @@ struct typed_instance_stor : instance_stor {
 
     virtual ~typed_instance_stor() { }
 
-    T data;
+    T data { };
 };
 
 struct instance {
@@ -264,7 +311,7 @@ struct instance {
     instance() { }
     instance(instance&& i) :
         m(i.m), ptrm(i.ptrm), stor(std::move(i.stor)) { }
-    instance(const instance& i) { operator=(i); }
+    instance(const instance& i) = delete;
 
     template<typename ... Args>
     instance call(const std::string& fn, Args&& ... args) const {
@@ -278,9 +325,7 @@ struct instance {
         return *this;
     }
 
-    instance& operator=(const instance& i) {
-        return operator=(std::move(i.clone()));
-    }
+    instance& operator=(const instance& i) = delete;
 
     bool is_null() const { return !stor.get(); }
     bool is_pointer() const { return m->is_same<void*>(); }
@@ -386,6 +431,8 @@ struct arg_type_ {
     pure_t& convert(instance& t) {
         if(t.get_meta().is_same<pure_t>())
             return t.get<pure_t>();
+        if(std::is_enum<T>::value && t.get_meta().is_same<size_t>())
+            return (pure_t&) t.get<size_t>();
         meta& target_m = meta_manager::get_meta<pure_t>();
         tmp = t.cast_to(target_m);
         return tmp.get<pure_t>();
@@ -441,7 +488,9 @@ inline RetType func_caller(instance* args[], size_t n,
         std::function<RetType(Head, Args...)> f)
 {
     if(n != sizeof...(Args) + 1)
-        throw restriction_error("Number of arguments does not match");
+        throw restriction_error("Number of arguments does not match: " +
+                std::to_string(sizeof...(Args)) + " required, " +
+                std::to_string(n) + " provided");
 
     arg_type_<Head> cur_arg;
 
@@ -492,6 +541,34 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...))
 
 template<typename T, typename ... Args>
 meta& meta::function(std::string name, void (T::*f) (Args...))
+{
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
+        func_caller(args + 1, n - 1, std::function<void(Args...)>(
+            [&args, f](Args ... a) {
+                (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+            }));
+        return instance();
+    };
+
+    return *this;
+}
+
+template<typename T, typename RetType, typename ... Args>
+meta& meta::function(std::string name, RetType (T::*f) (Args...) const)
+{
+    functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
+        return ret_type_<RetType>::convert(
+            func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
+                [&args, f](Args ... a) -> RetType {
+                    return (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+                })));
+    };
+
+    return *this;
+}
+
+template<typename T, typename ... Args>
+meta& meta::function(std::string name, void (T::*f) (Args...) const)
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         func_caller(args + 1, n - 1, std::function<void(Args...)>(

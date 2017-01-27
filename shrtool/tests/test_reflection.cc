@@ -121,7 +121,7 @@ public:
     void set_a(int a_) { a = a_; }
     void set_b(float b_) { b = b_; }
     void set_s(const string& s_) { s = s_; }
-    std::string get_s() { return s; }
+    std::string get_s() const { return s; }
     void set_move_s(string&& s_) { s = std::move(s_); }
 
     static void meta_reg_() {
@@ -155,7 +155,7 @@ TEST_CASE(test_clone)
     instance ins = instance::make(member_func_class());
     ins.call("set_a", instance::make(7));
     ins.call("set_b", instance::make(8));
-    instance ins2 = ins;
+    instance ins2 = ins.clone();
     assert_equal_print(ins2.get<member_func_class>().multiply(), 56);
     assert_true(&ins.get<member_func_class>()
             != &ins2.get<member_func_class>());
@@ -174,7 +174,32 @@ TEST_CASE(test_move)
             "god bless my program");
 
     ins.call("set_move_s", s2);
+    // s2 is moved, so it is no longer the original value
     assert_true(s2.get<string>() != "hello world");
+}
+
+TEST_CASE(test_built_in_func)
+{
+    instance num_1 = instance::make(6);
+    instance num_2 = instance::make(6);
+    instance res_1 = num_2.call("__equal", num_1);
+    assert_true(res_1.get_meta().is_same<bool>());
+    assert_true(res_1.get<bool>());
+
+    instance str_1 = instance::make(string("Good job"));
+    instance str_2 = instance::make(string("Bad job"));
+    instance str_3 = instance::make(string("Good job"));
+    instance res_2 = str_1.call("__equal", str_2);
+    instance res_3 = str_1.call("__equal", str_3);
+    assert_true(res_2.get_meta().is_same<bool>());
+    assert_true(res_3.get_meta().is_same<bool>());
+    assert_false(res_2.get<bool>());
+    assert_true(res_3.get<bool>());
+
+    instance prn_1 = num_1.call("__print");
+    instance prn_2 = str_1.call("__print");
+    assert_equal_print(prn_1.get<string>(), "6");
+    assert_equal_print(prn_2.get<string>(), "Good job");
 }
 
 int main(int argc, char* argv[])

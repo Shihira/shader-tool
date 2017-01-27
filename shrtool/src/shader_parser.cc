@@ -44,7 +44,7 @@ void shader_parser::load_shader(std::istream& is, shader_info& s)
         std::istreambuf_iterator<char>());
 
     SCM shader_list = scm_c_eval_string(scheme_code.c_str());
-    scm::parse_shader_from_scm(shader_list, s);
+    scm::builtin::parse_shader_from_scm(shader_list, s);
 }
 
 std::string layout::make_source_as_attr() const

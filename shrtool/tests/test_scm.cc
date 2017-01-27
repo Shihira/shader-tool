@@ -14,6 +14,7 @@ using namespace std;
 using namespace shrtool;
 
 TEST_CASE(test_scm_shader) {
+    refl::meta_manager::init();
     scm::init_scm();
 
     SCM strport = scm_open_output_string();
@@ -21,42 +22,14 @@ TEST_CASE(test_scm_shader) {
         locate_assets("shaders/blinn-phong.scm").c_str()));
     scm_c_define("strport", strport);
 
-    scm_c_eval_string(R"EOF(
-        (define blinn-phong-shader
-            (make-shader "blinn-phong" (load shader-list-path)))
-        (display (shader-source blinn-phong-shader 'vertex) strport)
-        (display blinn-phong-shader strport)
-        )EOF");
+    scm_c_eval_string(
+        "(define blinn-phong-shader (make-shader (load shader-list-path)))");
+    scm_c_eval_string(
+        "(display (shader-source blinn-phong-shader 'vertex) strport)");
+    scm_c_eval_string(
+        "(display blinn-phong-shader strport)");
 
-    assert_true(scm_is_true(scm_c_eval_string(R"EOF(
-        (equal? blinn-phong-shader 
-            (find-obj-by-name "blinn-phong"))
-        )EOF")));
-
-    assert_true(scm_is_true(scm_c_eval_string(R"EOF(
-        (equal? "blinn-phong"
-            (get-obj-name blinn-phong-shader))
-        )EOF")));
-
-    string src;
-
-    {
-        auto p = scm::get_pool().ref<shader_info>("blinn-phong");
-        assert_true(!p.expired());
-        auto& shdr = p.lock()->data;
-        auto* sshdr = shdr.get_sub_shader_by_type(shader::VERTEX);
-        assert_true(sshdr);
-        src = sshdr->make_source(shdr);
-    }
-
-    scm::get_pool().remove("blinn-phong");
-    scm_c_eval_string("(display blinn-phong-shader strport)");
-
-    assert_equal_print(
-            src +
-            string("#<shader blinn-phong>") +
-            string("#<shader INVALID!>"),
-            scm_to_latin1_string(scm_get_output_string(strport)));
+    ctest << scm_to_latin1_string(scm_strport_to_string(strport)) << endl;
 }
 
 int main(int argc, char* argv[])

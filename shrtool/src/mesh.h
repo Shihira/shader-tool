@@ -9,6 +9,7 @@
 #include "matrix.h"
 #include "image.h"
 #include "traits.h"
+#include "reflection.h"
 
 namespace shrtool {
 
@@ -218,6 +219,22 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
         positions(stor_positions, std::move(im.positions.indices)),
         normals(stor_normals, std::move(im.normals.indices)),
         uvs(stor_uvs, std::move(im.uvs.indices)) { }
+
+    static mesh_indexed gen_uv_sphere(double radius,
+            size_t tesel_u, size_t tesel_v, bool smooth = true);
+    static mesh_indexed gen_plane(double w, double h,
+            size_t tesel_u, size_t tesel_v);
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<mesh_indexed>("mesh")
+            .function("has_positions", &mesh_indexed::has_positions)
+            .function("has_normals", &mesh_indexed::has_normals)
+            .function("has_uvs", &mesh_indexed::has_uvs)
+            .function("triangles", static_cast<size_t (mesh_indexed::*)() const>(&mesh_indexed::triangles))
+            .function("vertices", static_cast<size_t (mesh_indexed::*)() const>(&mesh_indexed::vertices))
+            .function("gen_uv_sphere", gen_uv_sphere)
+            .function("gen_plane", gen_plane);
+    }
 };
 
 struct mesh_uv_sphere : mesh_indexed {
@@ -235,6 +252,15 @@ struct mesh_plane : mesh_indexed {
     mesh_plane(const mesh_plane& mp) : mesh_indexed(mp) { }
     mesh_plane(mesh_plane&& mp) : mesh_indexed(std::move(mp)) { }
 };
+
+inline mesh_indexed mesh_indexed::gen_uv_sphere(double radius,
+        size_t tesel_u, size_t tesel_v, bool smooth) {
+    return mesh_uv_sphere(radius, tesel_u, tesel_v, smooth);
+}
+inline mesh_indexed mesh_indexed::gen_plane(double w, double h,
+        size_t tesel_u, size_t tesel_v) {
+    return mesh_plane(w, h, tesel_u, tesel_v);
+}
 
 // well 
 struct mesh_io_object {

@@ -25,6 +25,7 @@
  */
 
 #include <functional>
+#include <iostream>
 
 #include "shading.h"
 #include "traits.h"

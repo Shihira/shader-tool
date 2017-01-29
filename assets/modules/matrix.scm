@@ -8,12 +8,12 @@
 
 (define mat-zeros
   (lambda (m n)
-    (make-typed-array 'f64 0 m n)))
+    (make-typed-array 'f32 0 m n)))
 
 (define mat?
   (lambda (A)
     (and
-      (eq? (array-type A) 'f64)
+      (eq? (array-type A) 'f32)
       (eq? (array-rank A) 2))))
 
 (define mat-size
@@ -60,7 +60,7 @@
 
 (define mat-eye
   (lambda (dim)
-    (mat-diagonal (make-typed-array 'f64 1 1 dim))))
+    (mat-diagonal (make-typed-array 'f32 1 1 dim))))
 
 (define mat-translate-4
   (lambda (x y z)
@@ -128,7 +128,7 @@
 
 (define list->mat
   (lambda (l)
-    (list->typed-array 'f64 '(0 0) l)))
+    (list->typed-array 'f32 '(0 0) l)))
 
 (define make-mat
   (lambda (. l)
@@ -243,24 +243,24 @@
 
 (define mat-test-cases
   (lambda ()
-    (let ((Mat1 #2f64((1 2 3)
+    (let ((Mat1 #2f32((1 2 3)
                       (4 5 4)
                       (3 2 1)))
-          (Mat2 #2f64((1 2.896 3)
+          (Mat2 #2f32((1 2.896 3)
                       (4.567 5 4)
                       (3 2 1.234))))
       (assert (mat-eq? (mat-diagonal (mat-rvec 5 6 7))
-                #2f64((5 0 0)
+                #2f32((5 0 0)
                       (0 6 0)
                       (0 0 7))))
       (assert (= (mat-index-fold4
                    (lambda (a b val ref) (+ val ref))
                    0 Mat1) 25))
       (assert (mat-eq? (mat-slice Mat1 '(1 3) '(0 2))
-                #2f64((4 5) (3 2))))
+                #2f32((4 5) (3 2))))
       (begin (mat-pretty Mat2) (newline))
-      (assert (mat-eq? (make-mat 1 2 ': 2 3) #2f64((1 2)(2 3))))
-      (assert (mat-eq? (make-mat 1 2 ': 2 3 ':) #2f64((1 2)(2 3))))
+      (assert (mat-eq? (make-mat 1 2 ': 2 3) #2f32((1 2)(2 3))))
+      (assert (mat-eq? (make-mat 1 2 ': 2 3 ':) #2f32((1 2)(2 3))))
       (assert (mat-eq? (mat-t (mat-rvec 5 8 9)) (mat-cvec 5 8 9)))
-      (assert (mat-eq? (mat-zeros 2 3) #2f64((0 0 0)(0 0 0)))))))
+      (assert (mat-eq? (mat-zeros 2 3) #2f32((0 0 0)(0 0 0)))))))
 

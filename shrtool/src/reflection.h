@@ -46,6 +46,14 @@ public:
         return functions.find(n) != functions.end();
     }
 
+    const std::map<std::string, fun_type>& function_set() const {
+        return functions;
+    }
+
+    std::map<std::string, fun_type>& function_set() {
+        return functions;
+    }
+
     template<typename RetType, typename ... Args>
     meta& function(std::string name, RetType (*f) (Args...));
     template<typename ... Args>
@@ -235,6 +243,7 @@ struct meta_manager : generic_singleton<meta_manager> {
 
         enable_cast<int, size_t>();
         enable_cast<int, float>();
+        enable_cast<int, double>();
         enable_cast<float, double>();
     }
 
@@ -243,6 +252,8 @@ struct meta_manager : generic_singleton<meta_manager> {
         typed_meta<T1>& m = static_cast<typed_meta<T1>&>(get_meta<T1>());
         m.template enable_cast <T2>();
     }
+
+    static std::map<size_t, meta>& meta_set() { return inst().metas; }
 
 private:
     friend class generic_singleton<meta_manager>;
@@ -366,6 +377,14 @@ struct instance {
         if(!m->has_function("__clone"))
             throw not_found_error("No cloning");
         return m->call("__clone", *this);
+    }
+
+    instance clone_object() const {
+        if(!is_pointer())
+            throw restriction_error("Not a pointer. Use clone instead.");
+        if(!ptrm || !ptrm->has_function("__clone"))
+            throw not_found_error("No cloning");
+        return ptrm->call("__clone", *this);
     }
 
 private:
@@ -581,13 +600,32 @@ meta& meta::function(std::string name, void (T::*f) (Args...) const)
     return *this;
 }
 
+#define LOG_REFL_CALLING
+
 inline instance meta::apply(const std::string& name, instance* i[], size_t n) const
 {
+#ifdef LOG_REFL_CALLING
+    std::cout << "Calling " << this->name()
+        << "::" << name << '(' << std::flush;
+    for(size_t e = 0; e < n; e++)
+        std::cout << i[e]->get_meta().name()
+            << (e == n - 1 ? "" : ", ") << std::flush;
+    std::cout << ")" << std::endl;
+#endif
+
     auto fi = functions.find(name);
     if(fi == functions.end())
         throw not_found_error("No such function: " + name);
     fun_type f = fi->second;
-    return f(i, n);
+    instance ins = f(i, n);
+
+#ifdef LOG_REFL_CALLING
+    std::cout << "Exiting " << this->name()
+        << "::" << name << " -> " << std::flush;
+    std::cout << ins.get_meta().name() << std::endl;
+#endif
+
+    return std::move(ins);
 }
 
 template<typename ... Args>

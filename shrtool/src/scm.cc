@@ -1,8 +1,11 @@
 #include <unordered_map>
+#include <list>
 #include <fstream>
 #include <sstream>
 
 #include "scm.h"
+#include "image.h"
+#include "mesh.h"
 
 #define sym_equ(s, str) scm_is_eq((s), scm_from_latin1_symbol(str))
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
@@ -36,9 +39,48 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
         { "geometry", shader::GEOMETRY },
     }))
 
+////////////////////////////////////////////////////////////////////////////////
+
+struct builtin {
+    static shader_info shader_from_config(scm_t lst) {
+        shader_info s;
+        parse_shader_from_scm(lst, s);
+        return std::move(s);
+    }
+
+    static image image_from_ppm(const std::string& fn) {
+        std::ifstream fin(fn);
+        return image_io_netpbm::load(fin);
+    }
+
+    static scm_t meshes_from_wavefront(const std::string& fn) {
+        std::ifstream fin(fn);
+        std::vector<mesh_indexed> meshes = mesh_io_object::load(fin);
+
+        SCM vec = scm_make_vector(scm_from_size_t(meshes.size()),
+                SCM_UNDEFINED);
+        for(size_t i = 0; i < meshes.size(); i++) {
+            scm_c_vector_set_x(vec, i, make_instance_scm(
+                        instance::make(std::move(meshes[i]))));
+        }
+
+        return vec;
+    }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<builtin>("builtin")
+            .function("shader_from_config", shader_from_config)
+            .function("image_from_ppm", image_from_ppm)
+            .function("meshes_from_wavefront", meshes_from_wavefront);
+    }
+};
+
+
 SCM instance_to_scm(instance&& ins)
 {
     const meta& m = ins.get_meta();
+    if(m.is_same<scm_t>())
+        return ins.get<scm_t>().scm;
     if(m.is_same<bool>())
         return scm_from_bool(ins.get<bool>());
     if(m.is_same<int>())
@@ -61,8 +103,6 @@ SCM instance_to_scm(instance&& ins)
 
 instance scm_to_instance(SCM s)
 {
-    if(SCM_SMOB_PREDICATE(instance_type, s))
-        return std::move(*(instance*)SCM_SMOB_DATA(s));
     if(scm_is_bool(s))
         return instance::make<bool>(scm_to_bool(s));
     if(scm_is_integer(s))
@@ -78,25 +118,27 @@ instance scm_to_instance(SCM s)
     return instance::make<scm_t>(scm_t(s));
 }
 
-std::vector<std::tuple<std::string, std::string, std::string>>
-func_info {
-    { "shader-source", "shader", "make_source" },
-    { "make-shader", "builtin", "make_shader" },
-};
+instance* extract_instance(SCM s)
+{
+    return (instance*)SCM_SMOB_DATA(s);
+}
 
 SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
 {
-    std::vector<instance> args;
+    std::list<instance> args; // must use list
+    std::vector<instance*> args_ptr;
 
     while(scm_is_pair(scm_args)) {
-        instance i = scm_to_instance(scm_car(scm_args));
-        args.emplace_back(std::move(i));
+        SCM cur = scm_car(scm_args);
+        if(SCM_SMOB_PREDICATE(instance_type, cur)) {
+            args_ptr.push_back(extract_instance(cur));
+        } else {
+            args.emplace_back(scm_to_instance(cur));
+            args_ptr.push_back(&args.back());
+        }
+
         scm_args = scm_cdr(scm_args);
     }
-
-    std::vector<instance*> args_ptr;
-    for(instance& i : args)
-        args_ptr.push_back(&i);
 
     meta& m = meta_manager::get_meta(scm_to_latin1_string(typenm));
     instance ins = m.apply(scm_to_latin1_string(funcnm),
@@ -109,9 +151,6 @@ void register_function(
         const std::string& typenm,
         const std::string& funcnm)
 {
-    scm_c_define_gsubr("general-subroutine",
-            3, 0, 0, (void*)general_subroutine);
-
     /*
      * (define FUNC
      *   (lambda args
@@ -132,6 +171,28 @@ void register_function(
         scm_interaction_environment());
 }
 
+void register_all()
+{
+    scm_c_define_gsubr("general-subroutine",
+            3, 0, 0, (void*)general_subroutine);
+
+    for(auto& m : meta_manager::meta_set()) {
+        for(auto& f : m.second.function_set()) {
+            if(!f.first.empty() && f.first[0] == '_')
+                continue;
+
+            std::string type_name = m.second.name();
+            std::string func_name =
+                (type_name != "builtin" ? (type_name + "-") : "") +
+                f.first;
+            for(char& c : func_name)
+                c = c == '_' ? '-' : c;
+
+            register_function(func_name, type_name, f.first);
+        }
+    }
+}
+
 void init_scm()
 {
     instance_type = scm_make_smob_type("instance", 0);
@@ -142,9 +203,11 @@ void init_scm()
     scm_t::meta_reg_();
     builtin::meta_reg_();
     shader_info::meta_reg();
+    color::meta_reg_();
+    image::meta_reg_();
+    mesh_indexed::meta_reg_();
 
-    for(auto& f : func_info)
-        register_function(std::get<0>(f), std::get<1>(f), std::get<2>(f));
+    register_all();
 }
 
 SCM make_instance_scm(instance&& ins)
@@ -157,7 +220,7 @@ SCM make_instance_scm(instance&& ins)
 
 size_t free_instance_scm(SCM ins)
 {
-    instance* pins = (instance*)SCM_SMOB_DATA(ins);
+    instance* pins = extract_instance(ins);
     if(pins) delete pins;
     SCM_SET_SMOB_DATA(ins, 0);
     return 0;
@@ -165,8 +228,8 @@ size_t free_instance_scm(SCM ins)
 
 SCM equalp_instance_scm(SCM a, SCM b)
 {
-    instance* pa = (instance*)SCM_SMOB_DATA(a);
-    instance* pb = (instance*)SCM_SMOB_DATA(b);
+    instance* pa = extract_instance(a);
+    instance* pb = extract_instance(b);
     if(pa->get_meta() != pb->get_meta())
         return SCM_BOOL_F;
     if(!pa->get_meta().has_function("__equal"))
@@ -180,9 +243,23 @@ int print_instance_scm(SCM ins, SCM port, scm_print_state* pstate)
     instance* pi = (instance*)SCM_SMOB_DATA(ins);
 
     std::stringstream prn;
-    if(!pi->get_meta().has_function("__print")) {
+    if(pi->is_pointer()) {
+        prn << "#<ref";
+        if(pi->get_pointer_meta()) {
+            prn << ':' << pi->get_pointer_meta()->name() << ' ';
+
+            if(pi->get_pointer_meta()->has_function("__print")) {
+                prn << pi->get_pointer_meta()->call("__print", *pi)
+                    .get<std::string>() << ">";
+            } else
+                prn << ' ' << pi << '>';
+        } else
+            prn << ' ' << pi << '>';
+    }
+    else if(!pi->get_meta().has_function("__print")) {
          prn << "#<instance " << pi->get_meta().name() << ' ' << pi << ">";
-    } else {
+    }
+    else {
         prn << "#<instance " << pi->get_meta().name() << ' ' <<
             pi->call("__print").get<std::string>() + ">";
     }
@@ -191,6 +268,8 @@ int print_instance_scm(SCM ins, SCM port, scm_print_state* pstate)
 
     return 0;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void parse_layout(SCM layout_list, std::vector<layout::type_name_pair>& l)
 {
@@ -207,8 +286,7 @@ void parse_layout(SCM layout_list, std::vector<layout::type_name_pair>& l)
     }
 }
 
-void builtin::parse_shader_from_scm(
-        scm_t shader_list_, shader_info& s)
+void parse_shader_from_scm(scm_t shader_list_, shader_info& s)
 {
     SCM shader_list = shader_list_.scm;
     if(scm_is_false(scm_list_p(shader_list)))

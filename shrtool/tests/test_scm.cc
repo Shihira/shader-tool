@@ -12,28 +12,78 @@
 
 using namespace std;
 using namespace shrtool;
+using namespace refl;
 
-TEST_CASE(test_scm_shader) {
-    refl::meta_manager::init();
-    scm::init_scm();
+struct scm_obj_fixture {
+    SCM strport;
 
-    SCM strport = scm_open_output_string();
-    scm_c_define("shader-list-path", scm_from_latin1_string(
-        locate_assets("shaders/blinn-phong.scm").c_str()));
-    scm_c_define("strport", strport);
+    scm_obj_fixture() {
+        scm_init_guile();
+        refl::meta_manager::init();
+        scm::init_scm();
+
+        strport = scm_open_output_string();
+        scm_c_define("strport", strport);
+    }
+
+    void def_path(const string& nm, const string& fn) {
+        scm_c_define(nm.c_str(), scm_from_latin1_string(
+            locate_assets(fn).c_str()));
+    }
+
+    std::string port_str() {
+        return scm_to_latin1_string(scm_strport_to_string(strport));
+    }
+};
+
+TEST_CASE_FIXTURE(test_scm_shader, scm_obj_fixture) {
+    def_path("shader-list-path", "shaders/blinn-phong.scm");
+
+    scm_c_eval_string("(define blinn-phong-shader"
+            "(shader-from-config (load shader-list-path)))");
+    refl::instance* si = scm::extract_instance(scm_c_eval_string(
+                "blinn-phong-shader"));
 
     scm_c_eval_string(
-        "(define blinn-phong-shader (make-shader (load shader-list-path)))");
-    scm_c_eval_string(
-        "(display (shader-source blinn-phong-shader 'vertex) strport)");
+        "(display (shader-gen-source blinn-phong-shader 'vertex) strport)");
     scm_c_eval_string(
         "(display blinn-phong-shader strport)");
 
-    ctest << scm_to_latin1_string(scm_strport_to_string(strport)) << endl;
+    stringstream ss;
+    ss << si->get<shader_info>().gen_source(shader::VERTEX);
+    ss << "#<instance shader " << si << ">";
+
+    assert_equal_print(port_str(), ss.str());
+}
+
+TEST_CASE_FIXTURE(test_scm_image, scm_obj_fixture) {
+    def_path("image-path", "textures/shihira.ppm");
+
+    scm_c_eval_string("(define shihira-image"
+            "(image-from-ppm image-path))");
+    scm_c_eval_string("(display (image-pixel shihira-image 1 1) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(display (image-width shihira-image) strport)");
+
+    ctest << port_str() << endl;
+}
+
+TEST_CASE_FIXTURE(test_scm_meshes, scm_obj_fixture) {
+    def_path("teapot-model-path", "models/teapot.obj");
+
+    scm_c_eval_string("(define uv-sphere"
+            "(mesh-gen-uv-sphere 5 10 10 #t))");
+    scm_c_eval_string("(display (mesh-vertices uv-sphere) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(define teapot"
+            "(meshes-from-wavefront teapot-model-path))");
+    scm_c_eval_string("(display (mesh-triangles"
+            "(vector-ref teapot 0)) strport)");
+
+    ctest << port_str() << endl;
 }
 
 int main(int argc, char* argv[])
 {
-    scm_init_guile();
     return unit_test::test_main(argc, argv);
 }

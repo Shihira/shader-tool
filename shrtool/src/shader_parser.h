@@ -79,7 +79,7 @@ struct shader_info {
     const sub_shader_info* get_sub_shader_by_type(shader::shader_type t) const;
     sub_shader_info* get_sub_shader_by_type(shader::shader_type t);
 
-    std::string make_source(shader::shader_type t) const {
+    std::string gen_source(shader::shader_type t) const {
         auto* s = get_sub_shader_by_type(t);
         if(!s) return "";
         return s->make_source(*this);
@@ -87,7 +87,7 @@ struct shader_info {
 
     static void meta_reg() {
         refl::meta_manager::reg_class<shader_info>("shader")
-            .function("make_source", &shader_info::make_source);
+            .function("gen_source", &shader_info::gen_source);
     }
 };
 

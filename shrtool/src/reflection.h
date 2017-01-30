@@ -369,11 +369,14 @@ struct instance {
     instance cast_to(const meta& rm) const {
         std::string func_name = "__to_" + rm.name();
         if(!m->has_function(func_name))
-            throw not_found_error("No type conversion");
+            throw not_found_error("No type conversion from " +
+                    get_meta().name() + " to " + rm.name());
         return m->call(func_name, *this);
     }
 
     instance clone() const {
+        if(is_null())
+            return instance();
         if(!m->has_function("__clone"))
             throw not_found_error("No cloning");
         return m->call("__clone", *this);
@@ -443,6 +446,13 @@ struct ret_type_<T&> {
     }
 };
 
+template<>
+struct ret_type_<instance> {
+    static instance convert(instance&& ins) {
+        return std::move(ins);
+    }
+};
+
 template<typename T>
 struct arg_type_ {
     instance tmp;
@@ -455,17 +465,6 @@ struct arg_type_ {
         meta& target_m = meta_manager::get_meta<pure_t>();
         tmp = t.cast_to(target_m);
         return tmp.get<pure_t>();
-    }
-};
-
-template<typename T>
-struct arg_type_<T&&> {
-    typedef typename std::remove_cv<T>::type pure_t;
-    pure_t&& convert(instance& t) {
-        if(t.get_meta().is_same<pure_t>()) {
-            return std::move(t.get<pure_t>());
-        } else
-            throw type_matching_error("Type not matched");
     }
 };
 
@@ -494,6 +493,24 @@ struct arg_type_<T&> : arg_type_<T>, arg_type_<T*> {
     }
 };
 
+template<typename T>
+struct arg_type_<T&&> : arg_type_<T&> {
+    typedef typename std::remove_cv<T>::type pure_t;
+    pure_t&& convert(instance& t) {
+        return std::move(arg_type_<T&>::convert(t));
+    }
+};
+
+template<>
+struct arg_type_<instance> {
+    instance& convert(instance& ins) { return ins; }
+};
+
+template<>
+struct arg_type_<instance*> {
+    instance* convert(instance& ins) { return &ins; }
+};
+
 template<typename RetType>
 inline RetType func_caller(instance*[], size_t n, std::function<RetType()> f)
 {
@@ -508,10 +525,11 @@ inline RetType func_caller(instance* args[], size_t n,
 {
     if(n != sizeof...(Args) + 1)
         throw restriction_error("Number of arguments does not match: " +
-                std::to_string(sizeof...(Args)) + " required, " +
+                std::to_string(sizeof...(Args) + 1) + " required, " +
                 std::to_string(n) + " provided");
 
-    arg_type_<Head> cur_arg;
+    typedef typename std::remove_cv<Head>::type pure_t;
+    arg_type_<pure_t> cur_arg;
 
     return func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
             [&](Args ... rest) -> RetType {
@@ -622,7 +640,8 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
 #ifdef LOG_REFL_CALLING
     std::cout << "Exiting " << this->name()
         << "::" << name << " -> " << std::flush;
-    std::cout << ins.get_meta().name() << std::endl;
+    if(ins.is_null()) std::cout << "void" << std::endl;
+    else std::cout << ins.get_meta().name() << std::endl;
 #endif
 
     return std::move(ins);

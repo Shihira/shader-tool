@@ -83,6 +83,30 @@ TEST_CASE_FIXTURE(test_scm_meshes, scm_obj_fixture) {
     ctest << port_str() << endl;
 }
 
+TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
+    scm_c_eval_string("(import (shrtool))");
+
+    scm_c_eval_string("(define propset (make-propset))");
+    scm_c_eval_string("(propset-append propset 2)");
+    scm_c_eval_string("(propset-append propset 3.2)");
+    scm_c_eval_string("(display (propset-definition propset"
+            " \"propset\") strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(display (propset-get propset 0) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(display (propset-get propset 1) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(display (propset-get propset 2) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(propset-set propset 1 (propset-get propset 0))");
+    scm_c_eval_string("(display (propset-get propset 1) strport)");
+    scm_newline(strport);
+    scm_c_eval_string("(display (propset-definition propset"
+            " \"propset\") strport)");
+
+    ctest << port_str() << endl;
+}
+
 int main(int argc, char* argv[])
 {
     return unit_test::test_main(argc, argv);

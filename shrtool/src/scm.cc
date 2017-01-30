@@ -6,6 +6,7 @@
 #include "scm.h"
 #include "image.h"
 #include "mesh.h"
+#include "properties.h"
 
 #define sym_equ(s, str) scm_is_eq((s), scm_from_latin1_symbol(str))
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
@@ -67,10 +68,15 @@ struct builtin {
         return vec;
     }
 
+    static dynamic_property make_propset() {
+        return dynamic_property();
+    }
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<builtin>("builtin")
             .function("shader_from_config", shader_from_config)
             .function("image_from_ppm", image_from_ppm)
+            .function("make_propset", make_propset)
             .function("meshes_from_wavefront", meshes_from_wavefront);
     }
 };
@@ -78,7 +84,11 @@ struct builtin {
 
 SCM instance_to_scm(instance&& ins)
 {
+    if(ins.is_null())
+        return SCM_UNDEFINED;
+
     const meta& m = ins.get_meta();
+
     if(m.is_same<scm_t>())
         return ins.get<scm_t>().scm;
     if(m.is_same<bool>())
@@ -98,6 +108,34 @@ SCM instance_to_scm(instance&& ins)
         return scm_from_latin1_stringn(s.c_str(), s.size());
     }
 
+    if(m.is_same<math::fxmat>()) {
+        math::fxmat& mat = ins.get<math::fxmat>();
+        SCM smat = scm_make_typed_array(
+                scm_from_latin1_symbol("f32"),
+                scm_from_double(0),
+                SCM_LIST2(scm_from_int(mat.rows()), scm_from_int(mat.cols())));
+        scm_t_array_handle handle;
+        scm_array_get_handle(smat, &handle);
+        float* arr_data = scm_array_handle_f32_writable_elements(&handle);
+        std::copy(mat.data(), mat.data() + mat.elem_count(), arr_data);
+        scm_array_handle_release(&handle);
+        return smat;
+    }
+
+    if(m.is_same<math::dxmat>()) {
+        math::dxmat& mat = ins.get<math::dxmat>();
+        SCM smat = scm_make_typed_array(
+                scm_from_latin1_symbol("f64"),
+                scm_from_double(0),
+                SCM_LIST2(scm_from_int(mat.rows()), scm_from_int(mat.cols())));
+        scm_t_array_handle handle;
+        scm_array_get_handle(smat, &handle);
+        double* arr_data = scm_array_handle_f64_writable_elements(&handle);
+        std::copy(mat.data(), mat.data() + mat.elem_count(), arr_data);
+        scm_array_handle_release(&handle);
+        return smat;
+    }
+
     return make_instance_scm(std::move(ins));
 }
 
@@ -114,6 +152,32 @@ instance scm_to_instance(SCM s)
     if(scm_is_symbol(s))
         return instance::make<size_t>(em_scm_enum_tranform__(
             scm_to_latin1_string(scm_symbol_to_string(s))));
+
+    if(scm_is_typed_array(s, scm_from_latin1_symbol("f64"))) {
+        math::dxmat mat;
+        scm_t_array_handle handle;
+        scm_array_get_handle(s, &handle);
+        SCM dim = scm_array_dimensions(s);
+        const double* arr_data = scm_array_handle_f64_elements(&handle);
+        mat.assign(scm_to_size_t(scm_car(dim)),
+                scm_to_size_t(scm_cadr(dim)));
+        std::copy(arr_data, arr_data + mat.elem_count(), mat.data());
+        scm_array_handle_release(&handle);
+        return instance::make<math::dxmat>(std::move(mat));
+    }
+
+    if(scm_is_typed_array(s, scm_from_latin1_symbol("f32"))) {
+        math::fxmat mat;
+        scm_t_array_handle handle;
+        scm_array_get_handle(s, &handle);
+        SCM dim = scm_array_dimensions(s);
+        const float* arr_data = scm_array_handle_f32_elements(&handle);
+        mat.assign(scm_to_size_t(scm_car(dim)),
+                scm_to_size_t(scm_cadr(dim)));
+        std::copy(arr_data, arr_data + mat.elem_count(), mat.data());
+        scm_array_handle_release(&handle);
+        return instance::make<math::fxmat>(std::move(mat));
+    }
 
     return instance::make<scm_t>(scm_t(s));
 }
@@ -206,6 +270,7 @@ void init_scm()
     color::meta_reg_();
     image::meta_reg_();
     mesh_indexed::meta_reg_();
+    dynamic_property::meta_reg_();
 
     register_all();
 }

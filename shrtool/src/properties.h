@@ -246,6 +246,14 @@ public:
 namespace shrtool {
 
 struct dynamic_property {
+    std::vector<refl::instance>& underlying() {
+        return storage;
+    }
+
+    void resize(size_t n) {
+        storage.resize(n);
+    }
+
     template<typename T>
     void append(T&& obj) {
         storage.push_back(refl::instance::make(std::move(obj)));
@@ -253,11 +261,19 @@ struct dynamic_property {
             throw restriction_error("Not serializable.");
     }
 
+    void append_instance(refl::instance&& ins) {
+        storage.emplace_back(std::move(ins));
+    }
+
     template<typename T>
     T& get(size_t idx) {
         if(idx >= storage.size())
             throw restriction_error("Index out of range");
         return storage[idx].get<T>();
+    }
+
+    refl::instance get_instance(size_t idx) {
+        return storage.at(idx).clone();
     }
 
     template<typename T>
@@ -269,8 +285,14 @@ struct dynamic_property {
             throw restriction_error("Not serializable.");
     }
 
+    void set_instance(size_t idx, refl::instance&& ins) {
+        if(idx >= storage.size())
+            throw restriction_error("Index out of range");
+        storage.at(idx) = std::move(ins);
+    }
+
     std::string definition(const std::string& name,
-            std::vector<std::string> l) {
+            const std::vector<std::string>& l) const {
         int i = 0;
         std::string def = "uniform " + name + " {\n";
         for(const std::string& s : l) {
@@ -286,6 +308,13 @@ struct dynamic_property {
         def += "};";
 
         return def;
+    }
+
+    std::string definition(const std::string& name) const {
+        std::vector<std::string> items(size(), "items_");
+        for(size_t i = 0; i < size(); i++)
+            items[i] += std::to_string(i);
+        return definition(name, items);
     }
 
     size_t size_in_bytes() const {
@@ -313,6 +342,16 @@ struct dynamic_property {
     dynamic_property& operator!() {
         is_changed_ = true;
         return *this;
+    }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<dynamic_property>("propset")
+            .function("get", &dynamic_property::get_instance)
+            .function("set", &dynamic_property::set_instance)
+            .function("definition", static_cast<std::string(dynamic_property::*)(const std::string&)const>(&dynamic_property::definition))
+            .function("append", &dynamic_property::append_instance)
+            .function("size_in_bytes", &dynamic_property::size_in_bytes)
+            .function("resize", &dynamic_property::resize);
     }
 
 protected:

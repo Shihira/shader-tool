@@ -7,6 +7,8 @@
 #include "image.h"
 #include "mesh.h"
 #include "properties.h"
+#include "render_assets.h"
+#include "render_queue.h"
 
 #define sym_equ(s, str) scm_is_eq((s), scm_from_latin1_symbol(str))
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
@@ -42,6 +44,8 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
 
 ////////////////////////////////////////////////////////////////////////////////
 
+provided_render_task::provider_bindings bindings;
+
 struct builtin {
     static shader_info shader_from_config(scm_t lst) {
         shader_info s;
@@ -72,11 +76,16 @@ struct builtin {
         return dynamic_property();
     }
 
+    static provided_render_task make_shading_rtask() {
+        return provided_render_task(bindings);
+    }
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<builtin>("builtin")
             .function("shader_from_config", shader_from_config)
             .function("image_from_ppm", image_from_ppm)
             .function("make_propset", make_propset)
+            .function("make_shading_rtask", make_shading_rtask)
             .function("meshes_from_wavefront", meshes_from_wavefront);
     }
 };
@@ -100,7 +109,7 @@ SCM instance_to_scm(instance&& ins)
     if(m.is_same<float>())
         return scm_from_double(ins.get<float>());
     if(m.is_same<double>())
-        return scm_from_double(ins.get<float>());
+        return scm_from_double(ins.get<double>());
     if(m.is_same<char>())
         return scm_from_char(ins.get<char>());
     if(m.is_same<std::string>()) {
@@ -146,7 +155,7 @@ instance scm_to_instance(SCM s)
     if(scm_is_integer(s))
         return instance::make<int>(scm_to_int(s));
     if(scm_is_real(s))
-        return instance::make<float>(scm_to_double(s));
+        return instance::make<double>(scm_to_double(s));
     if(scm_is_string(s))
         return instance::make<std::string>(scm_to_latin1_string(s));
     if(scm_is_symbol(s))
@@ -235,15 +244,55 @@ void register_function(
         scm_interaction_environment());
 }
 
+void register_constructor(std::string typenm)
+{
+    /*
+     * (define make-TYPENM
+     *   (lambda args
+     *     (general-subroutine TYPENM
+     *       (string-append "__init_"
+     *         (number->string (list-length args))) args)))
+     */
+
+    for(char& c : typenm)
+        c = c == '_' ? '-' : c;
+
+    scm_eval(SCM_LIST3(
+            scm_from_latin1_symbol("define"),
+            scm_from_latin1_symbol(("make-" + typenm).c_str()),
+            SCM_LIST3(
+                scm_from_latin1_symbol("lambda"),
+                scm_from_latin1_symbol("args"),
+                SCM_LIST4(
+                    scm_from_latin1_symbol("general-subroutine"),
+                    scm_from_latin1_string(typenm.c_str()),
+                    SCM_LIST3(
+                        scm_from_latin1_symbol("string-append"),
+                        scm_from_latin1_string("__init_"),
+                        SCM_LIST2(
+                            scm_from_latin1_symbol("number->string"),
+                            SCM_LIST2(
+                                scm_from_latin1_symbol("list-length"),
+                                scm_from_latin1_symbol("args")))),
+                    scm_from_latin1_symbol("args")))),
+        scm_interaction_environment());
+}
+
 void register_all()
 {
     scm_c_define_gsubr("general-subroutine",
             3, 0, 0, (void*)general_subroutine);
 
     for(auto& m : meta_manager::meta_set()) {
+        bool reged_cons = false;
+
         for(auto& f : m.second.function_set()) {
-            if(!f.first.empty() && f.first[0] == '_')
-                continue;
+            if(f.first.empty() && f.first[0] == '_') {
+                if(f.first.substr(0, 6) == "__init" && reged_cons) {
+                    register_constructor(m.second.name());
+                    reged_cons = true;
+                }
+            }
 
             std::string type_name = m.second.name();
             std::string func_name =
@@ -271,6 +320,11 @@ void init_scm()
     image::meta_reg_();
     mesh_indexed::meta_reg_();
     dynamic_property::meta_reg_();
+    render_task::meta_reg_();
+    queue_render_task::meta_reg_();
+    provided_render_task::meta_reg_();
+    render_target::meta_reg();
+    render_assets::texture2d::meta_reg_();
 
     register_all();
 }

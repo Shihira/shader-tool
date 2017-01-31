@@ -423,7 +423,8 @@ public:
     matrix operator+(const matrix& m) const {
         matrix result;
 
-        auto dst_i = result.begin(), src1_i = m.begin(), src2_i = begin();
+        auto dst_i = result.begin();
+        auto src1_i = m.begin(), src2_i = begin();
         for(; dst_i != result.end() && src1_i != m.end() && src2_i != m.end();
                 ++dst_i, ++src1_i, ++src2_i)
             *dst_i = *src1_i + *src2_i;
@@ -439,7 +440,8 @@ public:
     operator*(Numeric n) const {
         matrix result;
 
-        auto dst_i = result.begin(), src_i = begin();
+        auto dst_i = result.begin();
+        auto src_i = begin();
         for(; dst_i != result.end() && src_i != end(); ++dst_i, ++src_i)
             *dst_i = *src_i * n;
 
@@ -465,7 +467,8 @@ public:
     operator/(Numeric n) const {
         matrix result;
 
-        auto dst_i = result.begin(), src_i = begin();
+        auto dst_i = result.begin();
+        auto src_i = begin();
         for(; dst_i != result.end() && src_i != end(); ++dst_i, ++src_i)
             *dst_i = *src_i / n;
 
@@ -797,6 +800,7 @@ struct dynmatrix {
     dynmatrix(dynmatrix&& d) :
         rows_(d.rows_), cols_(d.cols_) {
         std::swap(d.data_, data_);
+        std::swap(d.is_agent_, is_agent_);
     }
 
     void assign(size_t rows, size_t cols) {
@@ -807,7 +811,7 @@ struct dynmatrix {
     }
 
     ~dynmatrix() {
-        if(data_) delete[] data_;
+        if(data_ && !is_agent_) delete[] data_;
     }
 
     value_type* data() { return data_; }
@@ -823,6 +827,19 @@ struct dynmatrix {
         return data_;
     }
 
+    static dynmatrix agent(size_t r, size_t c, value_type* v) {
+        dynmatrix mat;
+        mat.rows_ = r; mat.cols_ = c; mat.data_ = v;
+        mat.is_agent_ = true;
+
+        return std::move(mat);
+    }
+
+    template<size_t M, size_t N>
+    static dynmatrix agent(matrix<value_type, M, N>& m) {
+        return agent(m.rows, m.cols, m.data());
+    }
+
     size_t rows() const { return rows_; }
     size_t cols() const { return cols_; }
     size_t elem_count() const { return cols_ * rows_; }
@@ -832,6 +849,7 @@ private:
     size_t cols_ = 0;
 
     value_type* data_ = nullptr;
+    bool is_agent_ = false;
 };
 
 typedef dynmatrix<float> fxmat;

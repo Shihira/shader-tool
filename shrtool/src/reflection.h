@@ -3,6 +3,7 @@
 
 #include <string>
 #include <map>
+#include <set>
 #include <functional>
 #include <vector>
 #include <typeinfo>
@@ -95,6 +96,9 @@ struct typed_meta : meta {
     template<typename To>
     typed_meta& enable_cast();
 
+    template<typename To>
+    typed_meta& enable_base();
+
     /*
      * the argument Enable in parameter means to prevent compiler generates code
      * by default rather than only when the function is called.
@@ -126,9 +130,24 @@ struct typed_meta : meta {
         return *this;
     }
 
+    template<typename ... Args>
+    typed_meta& enable_construct() {
+        function("__init_" + std::to_string(sizeof...(Args)),
+                init_<Args...>);
+        return *this;
+    }
+
 private:
+    template<typename ... Args>
+    static T init_(Args ... args) {
+        return T(std::forward<Args>(args)...);
+    }
+
     template<typename To>
     static To cast_(const T& o) { return To(o); }
+
+    template<typename To>
+    static To& base_(T& o) { return o; }
 
     template<bool Enable = true>
     static T clone_(const T& o) {
@@ -245,6 +264,7 @@ struct meta_manager : generic_singleton<meta_manager> {
         enable_cast<int, float>();
         enable_cast<int, double>();
         enable_cast<float, double>();
+        enable_cast<double, float>();
     }
 
     template<typename T1, typename T2>
@@ -273,6 +293,16 @@ typed_meta<T>& typed_meta<T>::enable_cast()
     meta& to_m = meta_manager::get_meta<To>();
     std::string func_name = "__to_" + to_m.name();
     function(func_name, &cast_<To>);
+    return *this;
+}
+
+template<typename T>
+template<typename To>
+typed_meta<T>& typed_meta<T>::enable_base()
+{
+    meta& to_m = meta_manager::get_meta<To>();
+    std::string func_name = "__to_" + to_m.name();
+    function(func_name, &base_<To>);
     return *this;
 }
 
@@ -462,9 +492,16 @@ struct arg_type_ {
             return t.get<pure_t>();
         if(std::is_enum<T>::value && t.get_meta().is_same<size_t>())
             return (pure_t&) t.get<size_t>();
+
+        // failed to do direct conversion, try dynamic conversion
         meta& target_m = meta_manager::get_meta<pure_t>();
         tmp = t.cast_to(target_m);
-        return tmp.get<pure_t>();
+
+        if(tmp.is_pointer() && tmp.get_pointer_meta() &&
+                *tmp.get_pointer_meta() == target_m) {
+            return *reinterpret_cast<pure_t*>(t.get<void*>());
+        } else
+            return tmp.get<pure_t>();
     }
 };
 
@@ -567,9 +604,9 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...))
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<RetType>::convert(
-            func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
-                [&args, f](Args ... a) -> RetType {
-                    return (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+            func_caller(args, n, std::function<RetType(T&, Args...)>(
+                [&args, f](T& t, Args ... a) -> RetType {
+                    return (t.*f)(std::forward<Args>(a) ...);
                 })));
     };
 
@@ -580,9 +617,9 @@ template<typename T, typename ... Args>
 meta& meta::function(std::string name, void (T::*f) (Args...))
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
-        func_caller(args + 1, n - 1, std::function<void(Args...)>(
-            [&args, f](Args ... a) {
-                (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+        func_caller(args, n, std::function<void(T&, Args...)>(
+            [&args, f](T& t, Args ... a) {
+                (t.*f)(std::forward<Args>(a) ...);
             }));
         return instance();
     };

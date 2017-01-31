@@ -1,3 +1,6 @@
+#ifndef TEST_UTILS_INCLUDED 
+#define TEST_UTILS_INCLUDED 
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <cstdlib>
@@ -11,7 +14,7 @@ namespace shrtool {
 
 #ifndef NO_GUI_TEST
 
-class gui_fixture_base;
+struct gui_fixture_base;
 
 class gui_test_context : public generic_singleton<gui_test_context>
 {
@@ -148,4 +151,6 @@ inline std::string locate_assets(const std::string& fn)
 }
 
 }
+
+#endif // TEST_UTILS_INCLUDED 
 

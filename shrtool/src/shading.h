@@ -8,6 +8,7 @@
 
 #include "render_assets.h"
 #include "exception.h"
+#include "reflection.h"
 
 namespace shrtool {
 
@@ -67,8 +68,24 @@ public:
 
     bool isscr() const { return screen_; }
 
+    static render_target& get_screen() {
+        return screen;
+    }
+
     float target_ratio() const {
         return float(viewport_[2]) / float(viewport_[3]);
+    }
+
+    static void meta_reg() {
+        refl::meta_manager::reg_class<render_target>("render_target")
+            .function("screen", get_screen)
+            .function("set_viewport", &render_target::set_viewport)
+            .function("clear_buffer", &render_target::clear_buffer)
+            .function("initial_depth", &render_target::initial_depth)
+            .function("initial_color", &render_target::initial_color)
+            .function("enable_depth_test", &render_target::enable_depth_test)
+            .function("is_screen", &render_target::isscr)
+            .function("bind_texture", &render_target::render_texture);
     }
 
     static render_target screen;

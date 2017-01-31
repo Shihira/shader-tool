@@ -12,6 +12,8 @@ set(TESTS_REQUIRING_GL_CONTEXT
         test_prov_resources
         test_prov_shading
         test_render_queue
+        test_shader_parser
+        test_scm
     )
 
 set(TESTS_REQUIRING_GUILE

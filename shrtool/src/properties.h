@@ -348,8 +348,10 @@ struct dynamic_property {
         refl::meta_manager::reg_class<dynamic_property>("propset")
             .function("get", &dynamic_property::get_instance)
             .function("set", &dynamic_property::set_instance)
+            .function("set_float", &dynamic_property::set<float>)
             .function("definition", static_cast<std::string(dynamic_property::*)(const std::string&)const>(&dynamic_property::definition))
             .function("append", &dynamic_property::append_instance)
+            .function("append-float", &dynamic_property::append<float>)
             .function("size_in_bytes", &dynamic_property::size_in_bytes)
             .function("resize", &dynamic_property::resize);
     }

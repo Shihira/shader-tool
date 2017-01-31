@@ -1,7 +1,7 @@
 #define TEST_SUITE "test_scm"
 
 #define EXPOSE_EXCEPTION
-#define NO_GUI_TEST
+// #define NO_GUI_TEST
 
 #include <sstream>
 #include <fstream>
@@ -26,9 +26,8 @@ struct scm_obj_fixture {
         scm_c_define("strport", strport);
     }
 
-    void def_path(const string& nm, const string& fn) {
-        scm_c_define(nm.c_str(), scm_from_latin1_string(
-            locate_assets(fn).c_str()));
+    void def_str(const string& nm, const string& s) {
+        scm_c_define(nm.c_str(), scm_from_latin1_string(s.c_str()));
     }
 
     std::string port_str() {
@@ -37,7 +36,7 @@ struct scm_obj_fixture {
 };
 
 TEST_CASE_FIXTURE(test_scm_shader, scm_obj_fixture) {
-    def_path("shader-list-path", "shaders/blinn-phong.scm");
+    def_str("shader-list-path", locate_assets("shaders/blinn-phong.scm"));
 
     scm_c_eval_string("(define blinn-phong-shader"
             "(shader-from-config (load shader-list-path)))");
@@ -57,7 +56,7 @@ TEST_CASE_FIXTURE(test_scm_shader, scm_obj_fixture) {
 }
 
 TEST_CASE_FIXTURE(test_scm_image, scm_obj_fixture) {
-    def_path("image-path", "textures/shihira.ppm");
+    def_str("image-path", locate_assets("textures/shihira.ppm"));
 
     scm_c_eval_string("(define shihira-image"
             "(image-from-ppm image-path))");
@@ -69,7 +68,7 @@ TEST_CASE_FIXTURE(test_scm_image, scm_obj_fixture) {
 }
 
 TEST_CASE_FIXTURE(test_scm_meshes, scm_obj_fixture) {
-    def_path("teapot-model-path", "models/teapot.obj");
+    def_str("teapot-model-path", locate_assets("models/teapot.obj"));
 
     scm_c_eval_string("(define uv-sphere"
             "(mesh-gen-uv-sphere 5 10 10 #t))");
@@ -89,6 +88,7 @@ TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
     scm_c_eval_string("(define propset (make-propset))");
     scm_c_eval_string("(propset-append propset 2)");
     scm_c_eval_string("(propset-append propset 3.2)");
+    scm_c_eval_string("(propset-append propset (mat-zeros 3 3))");
     scm_c_eval_string("(display (propset-definition propset"
             " \"propset\") strport)");
     scm_newline(strport);
@@ -107,7 +107,35 @@ TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
     ctest << port_str() << endl;
 }
 
+#include "render_queue.h"
+
+struct union_fixture : singlefunc_fixture, scm_obj_fixture { };
+
+TEST_CASE_FIXTURE(test_scm_big_news, union_fixture) {
+    def_str("big-news-path", locate_assets("examples/scene.scm"));
+
+    scm_c_eval_string("(define main-rtask #nil)");
+    scm_c_eval_string("(import (shrtool))");
+    scm_c_eval_string("(load big-news-path)");
+    SCM main_rtask = scm_c_eval_string("main-rtask");
+
+    if(scm_is_null(main_rtask)) return;
+
+    provided_render_task& r = scm::extract_instance(main_rtask)
+        ->get<provided_render_task>();
+
+    draw = [&]() {
+        render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
+        render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
+
+        r.render();
+    };
+
+    main_loop();
+}
+
 int main(int argc, char* argv[])
 {
+    gui_test_context::init("330 core", "test_scm");
     return unit_test::test_main(argc, argv);
 }

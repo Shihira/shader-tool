@@ -8,6 +8,7 @@
 
 #include "shading.h"
 #include "providers.h"
+#include "reflection.h"
 
 namespace shrtool {
 
@@ -33,12 +34,18 @@ public:
         return deps_.find(&r) != deps_.end();
     }
 
-    virtual void render() const = 0;
+    virtual void render() const { }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<render_task>("rtask")
+            .enable_construct<>()
+            .function("rely_on", &render_task::rely_on)
+            .function("reclaim", &render_task::reclaim_reliance)
+            .function("is_successor", &render_task::is_successor);
+    }
 };
 
-class void_render_task : public render_task {
-    virtual void render() const { }
-};
+typedef render_task void_render_task;
 
 /*
  * It is not that sorting is forced before rendering, because it is quite costly.
@@ -72,6 +79,18 @@ public:
     const_iterator end() const { return tasks.end(); }
     const_iterator cbegin() const { return tasks.cbegin(); }
     const_iterator cend() const { return tasks.cend(); }
+
+    void push(const render_task& t) { tasks.push_back(&t); }
+    void pop(const render_task& t) { tasks.remove(&t); }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<queue_render_task>("queue_rtask")
+            .enable_construct<>()
+            .enable_base<render_task>()
+            .function("sort", &queue_render_task::sort)
+            .function("push", &queue_render_task::push)
+            .function("pop", &queue_render_task::pop);
+    }
 };
 
 /*
@@ -122,9 +141,21 @@ public:
             render_assets::property_buffer& p);
     void set_property(const std::string& name,
             render_assets::texture& p);
+    void set_texture_property(const std::string& name,
+            render_assets::texture& p) {
+        set_property(name, p);
+    }
 
     void render() const override;
 };
+
+}
+
+#include "shader_parser.h"
+#include "properties.h"
+#include "mesh.h"
+
+namespace shrtool {
 
 ////////////////////////////////////////////////////////////////////////////////
 // predesigned solution
@@ -221,7 +252,7 @@ public:
     void set_tex2d_property(const std::string& name, T& obj) {
         render_assets::texture2d& r = provider_bindings::set_binding
             <provider<T, render_assets::texture2d>>(obj, pb_.texture2d_bindings);
-        set_property(name, r);
+        set_texture_property(name, r);
         prop_updater[name] = [&obj, &r]() {
             provider<T, render_assets::texture2d>::update(obj, r, false);
         };
@@ -243,6 +274,17 @@ public:
     void render() const override {
         update();
         shader_render_task::render();
+    }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<provided_render_task>("shading_rtask")
+            .enable_base<render_task>()
+            .function("set_shader", &provided_render_task::set_shader<shader_info>)
+            .function("set_property", &provided_render_task::set_property<dynamic_property>)
+            .function("set_attributes", &provided_render_task::set_attributes<mesh_indexed>)
+            .function("set_texture2d_image", &provided_render_task::set_tex2d_property<image>)
+            .function("set_texture2d", static_cast<void(provided_render_task::*)(const std::string&, render_assets::texture2d&)>(&provided_render_task::set_tex2d_property))
+            .function("set_target", static_cast<void(provided_render_task::*)(render_target&)>(&provided_render_task::set_target));
     }
 };
 

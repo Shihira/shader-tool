@@ -8,6 +8,8 @@
 #include <memory>
 #include <unordered_map>
 
+#include "reflection.h"
+
 /*
  * NOTE: A render asset must not contain the reference of another.
  */
@@ -110,6 +112,14 @@ public:
     // this is for binding textures to a number for the current render pass
     // usually called by shader::draw
     virtual void bind_to(size_t tex_bind) const;
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<texture2d>("texture2d")
+            .enable_construct<size_t, size_t>()
+            .function("reserve", &texture2d::reserve)
+            .function("width", static_cast<size_t(texture2d::*)()const>(&texture2d::width))
+            .function("height", static_cast<size_t(texture2d::*)()const>(&texture2d::height));
+    }
 };
 
 class texture_cubemap2d : public texture {

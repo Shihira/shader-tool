@@ -4,48 +4,48 @@
 (import (srfi srfi-1))
 (import (ice-9 format))
 
-(define pi 3.14159265358979)
+(define-public pi 3.14159265358979)
 
-(define mat-zeros
+(define-public mat-zeros
   (lambda (m n)
     (make-typed-array 'f32 0 m n)))
 
-(define mat?
+(define-public mat?
   (lambda (A)
     (and
       (eq? (array-type A) 'f32)
       (eq? (array-rank A) 2))))
 
-(define mat-size
+(define-public mat-size
   (lambda (A)
     (assert (mat? A))
     (array-dimensions A)))
 
-(define mat-zeros-like
+(define-public mat-zeros-like
   (lambda (A)
     (apply mat-zeros (mat-size A))))
 
-(define mat-col-count
+(define-public mat-col-count
   (lambda (A)
     (cadr (mat-size A))))
 
-(define mat-row-count
+(define-public mat-row-count
   (lambda (A)
     (car (mat-size A))))
 
-(define mat-cvec?
+(define-public mat-cvec?
   (lambda (v)
     (and
       (mat? v)
       (= (mat-col-count v) 1))))
 
-(define mat-rvec?
+(define-public mat-rvec?
   (lambda (v)
     (and
       (mat? v)
       (= (mat-row-count v) 1))))
 
-(define mat-diagonal
+(define-public mat-diagonal
   (lambda (vec)
     (assert (mat-rvec? vec))
     (let*
@@ -58,11 +58,11 @@
             val)))
       M)))
 
-(define mat-eye
+(define-public mat-eye
   (lambda (dim)
     (mat-diagonal (make-typed-array 'f32 1 1 dim))))
 
-(define mat-translate-4
+(define-public mat-translate-4
   (lambda (x y z)
     (let ((M (mat-eye 4)))
       (array-set! M x 0 3)
@@ -70,11 +70,11 @@
       (array-set! M z 2 3)
       M)))
 
-(define mat-scale-4
+(define-public mat-scale-4
   (lambda (x y z)
     (mat-diagonal (list->rvec (list x y z 1)))))
 
-(define mat-rotate-4
+(define-public mat-rotate-4
   (lambda (axis angle)
     (let ((c (cos angle))
           (s (sin angle))
@@ -97,7 +97,7 @@
                    0 0 0 1 ':))
         (else (error "mat-rotate-4" "not supported axis"))))))
 
-(define mat-perspective-4
+(define-public mat-perspective-4
   (lambda (fovy aspect znear zfar)
     (let ((f (/ 1 (tan (/ fovy 2))))
           (zdiff (- znear zfar)))
@@ -106,31 +106,31 @@
                 0 0 (/ (+ zfar znear) zdiff) (/ (* 2 znear zfar) zdiff) ':
                 0 0 -1 0 ':))))
 
-(define mat+
+(define-public mat+
   (lambda (A B)
     (let ((M (mat-zeros-like A)))
       (array-map! M (lambda (a b) (+ a b)) A B)
       M)))
 
-(define mat-
+(define-public mat-
   (lambda (A B)
     (let ((M (mat-zeros-like A)))
       (array-map! M (lambda (a b) (- a b)) A B)
       M)))
 
-(define mat-t
+(define-public mat-t
   (lambda (A)
     (let ((M (apply mat-zeros (reverse (mat-size A)))))
       (array-index-map! M (lambda (r c) (array-ref A c r)))
       M)))
 
-(define mat-eq? array-equal?)
+(define-public mat-eq? array-equal?)
 
-(define list->mat
+(define-public list->mat
   (lambda (l)
     (list->typed-array 'f32 '(0 0) l)))
 
-(define make-mat
+(define-public make-mat
   (lambda (. l)
     (let* ((res (fold (lambda (e l)
                  (let ((working-list (car l))
@@ -144,23 +144,23 @@
                     (reverse (cons (reverse (car res)) (cadr res))))))
       (list->mat final))))
 
-(define list->rvec
+(define-public list->rvec
   (lambda (l)
     (list->mat (list l))))
 
-(define list->cvec
+(define-public list->cvec
   (lambda (l)
     (mat-t (list->rvec l))))
 
-(define mat-cvec
+(define-public mat-cvec
   (lambda (. l)
     (list->cvec l)))
 
-(define mat-rvec
+(define-public mat-rvec
   (lambda (. l)
     (list->rvec l)))
 
-(define mat-index-fold
+(define-public mat-index-fold
   (lambda (proc init A)
     (letrec* ((size (mat-size A))
               (r (car size)) (c (cadr size))
@@ -171,14 +171,14 @@
                         (iter (proc i j val) i (+ j 1))))))
       (iter init 0 0))))
 
-(define mat-index-fold4
+(define-public mat-index-fold4
   (lambda (proc init A)
     (mat-index-fold (lambda (r c val)
                       (proc r c val (mat-ref A r c))) init A)))
 
-(define mat-ref array-ref)
+(define-public mat-ref array-ref)
 
-(define mat-slice
+(define-public mat-slice
   (lambda (A rngr rngc)
     (let* ((reg-range (lambda (rng) rng))
            (reg-rngr (reg-range rngr))
@@ -191,7 +191,7 @@
          (mat-ref A (+ r (car reg-rngr)) (+ c (car reg-rngc)))))
      M)))
 
-(define mat*2
+(define-public mat*2
   (lambda (A B)
     (if (number? B)
       (let ((M (mat-zeros-like A)))
@@ -210,19 +210,19 @@
               (lambda (r c) (iter r c 0 0)))
             M)))))
 
-(define mat*
+(define-public mat*
   (lambda (. l)
    (cond
     ((not (pair? l)) #f)
     ((not (pair? (cdr l))) (car l))
     (else (apply mat* (cons (mat*2 (car l) (cadr l)) (cddr l)))))))
 
-(define mat/
+(define-public mat/
   (lambda (A a)
     (assert (number? a))
     (mat* A (/ 1 a))))
 
-(define mat-pretty
+(define-public mat-pretty
   (lambda (A . opt-port)
     (let ((max-len (mat-index-fold4
                      (lambda (r c fval e)

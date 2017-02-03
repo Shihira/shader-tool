@@ -82,6 +82,8 @@ public:
 
     void push(const render_task& t) { tasks.push_back(&t); }
     void pop(const render_task& t) { tasks.remove(&t); }
+    size_t size() const { return tasks.size(); }
+    void clear() { tasks.clear(); }
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<queue_render_task>("queue_rtask")
@@ -89,6 +91,8 @@ public:
             .enable_base<render_task>()
             .function("sort", &queue_render_task::sort)
             .function("push", &queue_render_task::push)
+            .function("size", &queue_render_task::size)
+            .function("clear", &queue_render_task::clear)
             .function("pop", &queue_render_task::pop);
     }
 };

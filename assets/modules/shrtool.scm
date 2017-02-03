@@ -1,55 +1,81 @@
-(define-module (shrtool)
-  #:export (
-      ;; shader-def
-      attr-mesh
-      prop-transfrm
-      
-      ;; matrix
-      pi
-      mat-zeros
-      mat?
-      mat-size
-      mat-zeros-like
-      mat-col-count
-      mat-row-count
-      mat-cvec?
-      mat-rvec?
-      mat-diagonal
-      mat-eye
-      mat-translate-4
-      mat-scale-4
-      mat-rotate-4
-      mat-perspective-4
-      mat+
-      mat-
-      mat-t
-      mat-eq?
-      list->mat
-      make-mat
-      list->rvec
-      list->cvec
-      mat-cvec
-      mat-rvec
-      mat-index-fold
-      mat-index-fold4
-      mat-ref
-      mat-slice
-      mat*
-      mat-pretty
+(define-module (shrtool))
 
-      ;; misc.
-      color
-      built-in-shader
-      built-in-model
-  ))
+(load-extension "libshrtool" "shrtool_init_scm")
 
-(include "shader-def.scm")
-(include "matrix.scm")
+(load "shader-def.scm")
+(load "matrix.scm")
 
-(define color
-  (lambda (r g b a) (mat-rvec r g b a)))
-(define built-in-shader
-  (lambda (name) #f))
-(define built-in-model
-  (lambda (name) #f))
+(define-public built-in-shader
+  (lambda (name)
+    (shader-from-config
+      (load (string-append
+              (getenv "SHRTOOL_ASSETS_DIR")
+              file-name-separator-string
+              "shaders"
+              file-name-separator-string
+              name
+              ".scm")))))
+
+(define-public built-in-model
+  (lambda (name)
+    (meshes-from-wavefront
+      (string-append
+        (getenv "SHRTOOL_ASSETS_DIR")
+        file-name-separator-string
+        "models"
+        file-name-separator-string
+        name
+        ".obj"))))
+
+(define eval-counter 1)
+
+(define find-var ;eval in interaction-environment
+  (lambda (obj)
+    (module-ref (current-module) obj)))
+
+(define eval-body
+  (lambda (str)
+    (let* ((org-sexpr (read (open-input-string str))) ; read the first sexpr
+           (full-sexpr (if (and (symbol? org-sexpr)
+                                (defined? org-sexpr)
+                                (or
+                                  (procedure? (find-var org-sexpr))
+                                  (macro? (find-var org-sexpr))))
+                         (read (open-input-string
+                                 (string-append "(" str ")")))
+                         org-sexpr)))
+      (cons #t (eval full-sexpr (interaction-environment))))))
+
+(define-public shrtool-repl-body
+  (lambda (str)
+    (let* ((val
+            (catch #t
+              (lambda () (eval-body str))
+              (lambda (k . a)
+                (cond
+                  ((eq? k 'read-error) #f)
+                  ((eq? k 'quit) #f)
+                  (else
+                    (display "Uncaught exception: ")
+                    (display (cons k a))
+                    (newline)))
+                (list #f k a))))
+           (suc (car val))
+           (ret (cdr val))
+           (varname (string-append "$" (number->string eval-counter))))
+      (if (not (or
+                 (not suc)
+                 (null? ret)
+                 (eof-object? ret)
+                 (unspecified? ret)))
+        (begin
+          (display (string-append varname " = "))
+          (display ret)
+          (newline)
+          (eval
+            (list 'define (string->symbol varname) ret)
+            (interaction-environment))
+          (set! eval-counter (+ 1 eval-counter))
+          val)
+        val))))
 

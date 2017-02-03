@@ -2,10 +2,10 @@
 #define IMAGE_H_INCLUDED
 
 #include <iostream>
-#include <render_assets.h>
 
 #include "traits.h"
 #include "reflection.h"
+#include "render_assets.h"
 
 namespace shrtool {
 

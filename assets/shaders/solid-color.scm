@@ -1,8 +1,8 @@
 (use-modules (shrtool))
 
 `((name . "solid-color")
-  ,attr-mesh
-  ,prop-transfrm
+  ,shader-def-attr-mesh
+  ,shader-def-prop-transfrm
   (property-group
     (name . "material")
     (layout

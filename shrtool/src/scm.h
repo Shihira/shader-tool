@@ -36,6 +36,7 @@ int print_instance_scm(SCM ins, SCM port, scm_print_state* pstate);
 
 // misc.
 void parse_shader_from_scm(scm_t lst, shader_info& s);
+bool is_symbol_eq(SCM sym, const std::string& s);
 
 }
 

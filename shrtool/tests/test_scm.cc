@@ -19,8 +19,7 @@ struct scm_obj_fixture {
 
     scm_obj_fixture() {
         scm_init_guile();
-        refl::meta_manager::init();
-        scm::init_scm();
+        scm_c_eval_string("(import (shrtool))");
 
         strport = scm_open_output_string();
         scm_c_define("strport", strport);
@@ -83,8 +82,6 @@ TEST_CASE_FIXTURE(test_scm_meshes, scm_obj_fixture) {
 }
 
 TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
-    scm_c_eval_string("(import (shrtool))");
-
     scm_c_eval_string("(define propset (make-propset))");
     scm_c_eval_string("(propset-append propset 2)");
     scm_c_eval_string("(propset-append propset 3.2)");
@@ -115,7 +112,6 @@ TEST_CASE_FIXTURE(test_scm_big_news, union_fixture) {
     def_str("big-news-path", locate_assets("examples/scene.scm"));
 
     scm_c_eval_string("(define main-rtask #nil)");
-    scm_c_eval_string("(import (shrtool))");
     scm_c_eval_string("(load big-news-path)");
     SCM main_rtask = scm_c_eval_string("main-rtask");
 

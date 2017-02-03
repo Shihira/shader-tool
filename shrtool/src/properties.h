@@ -252,6 +252,9 @@ struct dynamic_property {
 
     void resize(size_t n) {
         storage.resize(n);
+
+        offset_changed_ = true;
+        is_changed_ = true;
     }
 
     template<typename T>
@@ -259,10 +262,16 @@ struct dynamic_property {
         storage.push_back(refl::instance::make(std::move(obj)));
         if(!storage.back().get_meta().has_function("__raw_into"))
             throw restriction_error("Not serializable.");
+
+        offset_changed_ = true;
+        is_changed_ = true;
     }
 
     void append_instance(refl::instance&& ins) {
         storage.emplace_back(std::move(ins));
+
+        offset_changed_ = true;
+        is_changed_ = true;
     }
 
     template<typename T>
@@ -283,12 +292,18 @@ struct dynamic_property {
         storage[idx] = refl::instance::make(std::move(obj));
         if(!storage[idx].get_meta().has_function("__raw_into"))
             throw restriction_error("Not serializable.");
+
+        offset_changed_ = true;
+        is_changed_ = true;
     }
 
     void set_instance(size_t idx, refl::instance&& ins) {
         if(idx >= storage.size())
             throw restriction_error("Index out of range");
         storage.at(idx) = std::move(ins);
+
+        offset_changed_ = true;
+        is_changed_ = true;
     }
 
     std::string definition(const std::string& name,

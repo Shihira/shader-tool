@@ -2,33 +2,34 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-model
-  (mesh-gen-uv-sphere 2 20 10 #t))
+; (mesh-gen-uv-sphere 2 20 10 #t))
+ (vector-ref (built-in-model "teapot") 0))
 (display main-model)
 (newline)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-shader
-  (shader-from-config (load "../shaders/blinn-phong.scm")))
+  (built-in-shader "blinn-phong"))
 (display main-shader)
 (newline)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define prop-illum
+(define propset-illum
   (make-propset))
-(propset-resize prop-illum 3)
-(propset-set prop-illum 0 (mat-cvec -2 3 4 1))
-(propset-set prop-illum 1 (mat-cvec 1 1 1 1))
-(propset-set prop-illum 2 (mat-cvec 0 1 5 1))
-(display (propset-definition prop-illum "prop_illum"))
+(propset-resize propset-illum 3)
+(propset-set propset-illum 0 (mat-cvec -2 3 4 1))
+(propset-set propset-illum 1 (mat-cvec 1 1 1 1))
+(propset-set propset-illum 2 (mat-cvec 0 1 5 1))
+(display (propset-definition propset-illum "prop_illum"))
 (newline)
 
-(define prop-material
+(define propset-material
   (make-propset))
-(propset-resize prop-material 3)
-(propset-set prop-material 0 (mat-cvec 0.1 0.1 0.13 1))
-(propset-set prop-material 1 (mat-cvec 0.7 0.7 0.7 1))
-(propset-set prop-material 2 (mat-cvec 0.2 0.2 0.5 1))
-(display (propset-definition prop-material "prop_illum"))
+(propset-resize propset-material 3)
+(propset-set propset-material 0 (mat-cvec 0.1 0.1 0.13 1))
+(propset-set propset-material 1 (mat-cvec 0.7 0.7 0.7 1))
+(propset-set propset-material 2 (mat-cvec 0.2 0.2 0.5 1))
+(display (propset-definition propset-material "prop_illum"))
 (newline)
 
 (define matrix-model (mat-eye 4))
@@ -42,14 +43,14 @@
 (mat-pretty matrix-projection)
 (newline)
 
-(define prop-transfrm
+(define propset-transfrm
   (make-propset))
-(propset-resize prop-transfrm 2)
-(propset-set prop-transfrm 0 (mat* matrix-projection
+(propset-resize propset-transfrm 2)
+(propset-set propset-transfrm 0 (mat* matrix-projection
                                    matrix-view
                                    matrix-model))
-(propset-set prop-transfrm 1 matrix-model)
-(display (propset-definition prop-transfrm "prop_illum"))
+(propset-set propset-transfrm 1 matrix-model)
+(display (propset-definition propset-transfrm "prop_illum"))
 (newline)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -62,9 +63,9 @@
 (define main-rtask
   (make-shading-rtask))
 (shading-rtask-set-attributes main-rtask main-model)
-(shading-rtask-set-property main-rtask "material" prop-material)
-(shading-rtask-set-property main-rtask "illum" prop-illum)
-(shading-rtask-set-property main-rtask "transfrm" prop-transfrm)
+(shading-rtask-set-property main-rtask "material" propset-material)
+(shading-rtask-set-property main-rtask "illum" propset-illum)
+(shading-rtask-set-property main-rtask "transfrm" propset-transfrm)
 (shading-rtask-set-shader main-rtask main-shader)
 (shading-rtask-set-target main-rtask (render-target-screen))
 

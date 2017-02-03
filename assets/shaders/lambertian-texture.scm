@@ -1,8 +1,8 @@
 (use-modules (shrtool))
     
 `((name . "lambertian-texture")
-  ,attr-mesh
-  ,prop-transfrm
+  ,shader-def-attr-mesh
+  ,shader-def-prop-transfrm
   (property-group
     (name . "illum")
     (layout

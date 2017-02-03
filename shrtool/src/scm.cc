@@ -10,7 +10,6 @@
 #include "render_assets.h"
 #include "render_queue.h"
 
-#define sym_equ(s, str) scm_is_eq((s), scm_from_latin1_symbol(str))
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
 // bith = built-in type hint
 #define scm_bith(t, o, n) SCM_ASSERT_TYPE( \
@@ -45,6 +44,11 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
 ////////////////////////////////////////////////////////////////////////////////
 
 provided_render_task::provider_bindings bindings;
+
+bool is_symbol_eq(SCM sym, const std::string& s)
+{
+    return scm_is_eq(sym, scm_from_latin1_symbol(s.c_str()));
+}
 
 struct builtin {
     static shader_info shader_from_config(scm_t lst) {
@@ -94,7 +98,7 @@ struct builtin {
 SCM instance_to_scm(instance&& ins)
 {
     if(ins.is_null())
-        return SCM_UNDEFINED;
+        return SCM_UNSPECIFIED;
 
     const meta& m = ins.get_meta();
 
@@ -198,25 +202,31 @@ instance* extract_instance(SCM s)
 
 SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
 {
-    std::list<instance> args; // must use list
-    std::vector<instance*> args_ptr;
+    try {
+        std::list<instance> args; // must use list
+        std::vector<instance*> args_ptr;
 
-    while(scm_is_pair(scm_args)) {
-        SCM cur = scm_car(scm_args);
-        if(SCM_SMOB_PREDICATE(instance_type, cur)) {
-            args_ptr.push_back(extract_instance(cur));
-        } else {
-            args.emplace_back(scm_to_instance(cur));
-            args_ptr.push_back(&args.back());
+        while(scm_is_pair(scm_args)) {
+            SCM cur = scm_car(scm_args);
+            if(SCM_SMOB_PREDICATE(instance_type, cur)) {
+                args_ptr.push_back(extract_instance(cur));
+            } else {
+                args.emplace_back(scm_to_instance(cur));
+                args_ptr.push_back(&args.back());
+            }
+
+            scm_args = scm_cdr(scm_args);
         }
 
-        scm_args = scm_cdr(scm_args);
+        meta& m = meta_manager::get_meta(scm_to_latin1_string(typenm));
+        instance ins = m.apply(scm_to_latin1_string(funcnm),
+                args_ptr.data(), args_ptr.size());
+        return instance_to_scm(std::move(ins));
+    } catch(const std::exception& e) {
+        return scm_throw(scm_from_latin1_symbol("cpp-error"),
+                SCM_LIST2(scm_from_latin1_string(typeid(e).name()),
+                    scm_from_latin1_string(e.what())));
     }
-
-    meta& m = meta_manager::get_meta(scm_to_latin1_string(typenm));
-    instance ins = m.apply(scm_to_latin1_string(funcnm),
-            args_ptr.data(), args_ptr.size());
-    return instance_to_scm(std::move(ins));
 }
 
 void register_function(
@@ -231,7 +241,7 @@ void register_function(
      */
 
     scm_eval(SCM_LIST3(
-            scm_from_latin1_symbol("define"),
+            scm_from_latin1_symbol("define-public"),
             scm_from_latin1_symbol(func.c_str()),
             SCM_LIST3(
                 scm_from_latin1_symbol("lambda"),
@@ -258,7 +268,7 @@ void register_constructor(std::string typenm)
         c = c == '_' ? '-' : c;
 
     scm_eval(SCM_LIST3(
-            scm_from_latin1_symbol("define"),
+            scm_from_latin1_symbol("define-public"),
             scm_from_latin1_symbol(("make-" + typenm).c_str()),
             SCM_LIST3(
                 scm_from_latin1_symbol("lambda"),
@@ -408,44 +418,61 @@ void parse_layout(SCM layout_list, std::vector<layout::type_name_pair>& l)
 void parse_shader_from_scm(scm_t shader_list_, shader_info& s)
 {
     SCM shader_list = shader_list_.scm;
-    if(scm_is_false(scm_list_p(shader_list)))
+
+    if(!scm_is_pair(shader_list))
         throw unsupported_error("Shader is not a proper list.");
 
-    for(SCM cur = scm_car(shader_list), tail = scm_cdr(shader_list);;
-            cur = scm_car(tail), tail = scm_cdr(tail)) {
+    SCM elem = shader_list;
+    while(scm_is_pair(elem)) {
+        SCM cur = scm_car(elem);
+        if(!scm_is_pair(cur))
+            throw unsupported_error("Shader is not a proper list.");
+
         SCM symbol = scm_car(cur),
             alist = scm_cdr(cur);
 
-        if(sym_equ(symbol, "name")) {
+        if(is_symbol_eq(symbol, "name")) {
             s.name = scm_to_latin1_string(alist);
         }
-        else if(sym_equ(symbol, "attributes")) {
+        else if(is_symbol_eq(symbol, "attributes")) {
             parse_layout(map_idx(alist, "layout"), s.attributes.value);
         }
-        else if(sym_equ(symbol, "property-group")) {
+        else if(is_symbol_eq(symbol, "property-group")) {
             shader_info::property_group_t pg;
             pg.first = scm_to_latin1_string(map_idx(alist, "name"));
             parse_layout(map_idx(alist, "layout"), pg.second.value);
 
             s.property_groups.push_back(std::move(pg));
         }
-        else if(sym_equ(symbol, "sub-shader")) {
+        else if(is_symbol_eq(symbol, "sub-shader")) {
             sub_shader_info ssi;
             ssi.version = scm_to_latin1_string(map_idx(alist, "version"));
             ssi.source = scm_to_latin1_string(map_idx(alist, "source"));
 
-            if(sym_equ(map_idx(alist, "type"), "fragment"))
+            if(is_symbol_eq(map_idx(alist, "type"), "fragment"))
                 ssi.type = shader::FRAGMENT;
-            if(sym_equ(map_idx(alist, "type"), "vertex"))
+            if(is_symbol_eq(map_idx(alist, "type"), "vertex"))
                 ssi.type = shader::VERTEX;
 
             s.sub_shaders.push_back(std::move(ssi));
         }
 
-        if(scm_is_null(tail)) break;
+        elem = scm_cdr(elem);
     }
 }
 
+}
+
+}
+
+//////////////////////////////////////// guile helper
+
+extern "C" {
+
+void shrtool_init_scm()
+{
+    shrtool::refl::meta_manager::init();
+    shrtool::scm::init_scm();
 }
 
 }

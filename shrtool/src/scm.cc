@@ -32,7 +32,7 @@ DEF_ENUM_MAP(em_scm_sym_type_name__, std::string, layout::item_type, ({
         { "int", layout::INT },
         { "float", layout::FLOAT },
         { "tex2d", layout::TEX2D },
-        { "texcubemap", layout::TEXCUBEMAP },
+        { "texcube", layout::TEXCUBEMAP },
     }))
 
 DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({

@@ -301,5 +301,43 @@ mesh_plane::mesh_plane(double w, double h,
     }
 }
 
+mesh_box::mesh_box(double l, double w, double h)
+{
+    static size_t gray_code[4][2] = {{0,0}, {1,0}, {1,1}, {0,1}};
+    static size_t tri_gc[6] = {0, 1, 2, 2, 3, 0};
+
+    for(int i = 0; i <= 1; i++)
+    for(int j = 0; j <= 1; j++)
+    for(int k = 0; k <= 1; k++)
+        stor_positions->push_back(
+            col4 {(i - 0.5) * l, (j - 0.5) * w, (k - 0.5) * h, 1});
+
+    for(int i = 0; i < 4; i++)
+        stor_uvs->push_back(col3 {
+            double(gray_code[i][0]),
+            double(gray_code[i][1]), 1});
+
+    for(int i = 0; i < 6; i++) {
+        int dir = i % 2;
+        int facet = i / 2;
+
+        // add normal
+        stor_normals->push_back({0, 0, 0});
+        stor_normals->back()[facet] = dir * 2 - 1;
+
+        // add facet
+        for(int g_ = 0; g_ < 6; g_++) {
+            int g = tri_gc[dir ? g_ : 5 - g_], ijk[3];
+            ijk[facet] = dir;
+            ijk[(facet + 1) % 3] = gray_code[g][0];
+            ijk[(facet + 2) % 3] = gray_code[g][1];
+
+            positions.indices.push_back(ijk[0] << 2 | ijk[1] << 1 | ijk[2]);
+            normals.indices.push_back(i);
+            uvs.indices.push_back(g);
+        }
+    }
+}
+
 }
 

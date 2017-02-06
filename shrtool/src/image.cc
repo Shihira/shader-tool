@@ -32,27 +32,73 @@ color* image::lazy_data_() const
     return data_;
 }
 
+void image::copy_pixel(size_t offx, size_t offy, size_t w, size_t h,
+        image& dest, size_t dest_x, size_t dest_y) const {
+    if(offx + w > width() || offy + h > height() ||
+            dest_x + w > dest.width() || dest_y + h > dest.height()) {
+        throw restriction_error("Out of bound");
+    }
+
+    const color* csrc = data() + width() * offy + offx;
+    color* cdest = dest.data() + dest.width() * dest_y + dest_x;
+
+    for(size_t y = 0; y < h; y++) {
+        for(size_t x = 0; x < w; x++, cdest++, csrc++) {
+            *cdest = *csrc;
+        }
+        csrc += width() - w;
+        cdest += dest.width() - w;
+    }
+}
+
+/* 0    +Y
+ * 1 -X +Z +X -Z
+ * 2    -Y
+ *   0  1  2  3
+ */
+image image::load_cubemap_from(const image& img) {
+    if(img.width() % 4 || img.height() % 3 ||
+            img.width() / 4 != img.height() / 3) {
+        throw restriction_error("Size of cubmap is not regular");
+    }
+
+    size_t unit = img.width() / 4;
+
+    static size_t coords[6][2] = {
+        { 2, 1 }, { 0, 1 },
+        { 1, 0 }, { 1, 2 },
+        { 1, 1 }, { 3, 1 },
+    };
+
+    image new_img(unit, unit * 6);
+    for(size_t i = 0; i < 6; i++) {
+        img.copy_pixel(coords[i][0] * unit, coords[i][1] * unit,
+                unit, unit, new_img, 0, i * unit);
+    }
+
+    return std::move(new_img);
+}
 static void load_netpbm_body_plain(std::istream& is, image& im, size_t space)
 {
-    for(auto i = im.begin(); i != im.end(); ++i) {
-        uint16_t comp;
-        for(size_t c = 0; c < 3; ++c) {
-            is >> comp >> std::ws;
+for(auto i = im.begin(); i != im.end(); ++i) {
+    uint16_t comp;
+    for(size_t c = 0; c < 3; ++c) {
+        is >> comp >> std::ws;
 
-            if(is.fail()) {
-                if(is.eof()) throw parse_error(
-                        "EOF too early while reading image");
-                else throw parse_error("Bad Netpbm image: body");
-            }
-
-            uint8_t comp_byte = comp;
-            if(space > 255)
-                comp_byte = comp / ((space + 1) / 256);
-            else if(space < 255)
-                comp_byte = comp * 256 / (space + 1) + comp;
-            i->data.bytes[c] = comp_byte;
+        if(is.fail()) {
+            if(is.eof()) throw parse_error(
+                    "EOF too early while reading image");
+            else throw parse_error("Bad Netpbm image: body");
         }
+
+        uint8_t comp_byte = comp;
+        if(space > 255)
+            comp_byte = comp / ((space + 1) / 256);
+        else if(space < 255)
+            comp_byte = comp * 256 / (space + 1) + comp;
+        i->data.bytes[c] = comp_byte;
     }
+}
 }
 
 template<typename CompT>

@@ -101,19 +101,15 @@ void render_target::set_viewport(size_t x, size_t y, size_t w, size_t h) {
 
 void render_target::render_texture(
         render_target::buffer_attachment ba,
-        render_assets::texture2d &tex) {
-    tex.reserve();
+        render_assets::texture &tex) {
     glBindFramebuffer(GL_FRAMEBUFFER, id());
-    glFramebufferTexture2D(GL_FRAMEBUFFER, em_buffer_attachment_(ba),
-            GL_TEXTURE_2D, tex.id(), 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+    tex.attach_to(em_buffer_attachment_(ba));
 
     viewport_[0] = 0;
     viewport_[1] = 0;
     viewport_[2] = tex.width();
     viewport_[3] = tex.height();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, id());
     glViewport(0, 0, tex.width(), tex.height());
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }

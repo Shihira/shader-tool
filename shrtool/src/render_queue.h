@@ -110,18 +110,11 @@ public:
  */
 
 class shader_render_task : public render_task {
-    struct prop_maybe {
-        enum { PROP_BUF, TEX } what;
-        union {
-            render_assets::property_buffer* prop_buf;
-            render_assets::texture* tex;
-        } value;
-    };
-
     shader* shr_ = nullptr;
     render_target* target_ = nullptr;
     vertex_attr_vector* attr_ = nullptr;
-    std::map<std::string, prop_maybe> prop_;
+    std::map<std::string, render_assets::property_buffer*> prop_;
+    std::map<std::string, render_assets::texture*> prop_tex_;
 
     mutable bool prop_buf_ref_changed = true;
 
@@ -143,12 +136,8 @@ public:
 
     void set_property(const std::string& name,
             render_assets::property_buffer& p);
-    void set_property(const std::string& name,
-            render_assets::texture& p);
     void set_texture_property(const std::string& name,
-            render_assets::texture& p) {
-        set_property(name, p);
-    }
+            render_assets::texture& p);
 
     void render() const override;
 };
@@ -180,6 +169,7 @@ public:
         std::map<size_t, render_target> target_bindings;
         std::map<size_t, vertex_attr_vector> attr_bindings;
         std::map<size_t, render_assets::texture2d> texture2d_bindings;
+        std::map<size_t, render_assets::texture_cubemap> texture_cubemap_bindings;
         std::map<size_t, render_assets::property_buffer> property_bindings;
 
         template<typename Prov, typename T, typename Bindings>
@@ -193,6 +183,16 @@ public:
             }
 
             return res->second;
+        }
+
+        std::map<size_t, render_assets::texture2d>& get_binding(
+                render_assets::texture2d*) {
+            return texture2d_bindings;
+        }
+
+        std::map<size_t, render_assets::texture_cubemap>& get_binding(
+                render_assets::texture_cubemap*) {
+            return texture_cubemap_bindings;
         }
     };
 
@@ -252,18 +252,20 @@ public:
         };
     }
 
-    template<typename T>
-    void set_tex2d_property(const std::string& name, T& obj) {
-        render_assets::texture2d& r = provider_bindings::set_binding
-            <provider<T, render_assets::texture2d>>(obj, pb_.texture2d_bindings);
+    template<typename Tex, typename T,
+        typename Enable = typename std::enable_if<
+            std::is_base_of<render_assets::texture, Tex>::value>::type>
+    void set_texture_property(const std::string& name, T& obj) {
+        Tex& r = provider_bindings::set_binding<provider<T, Tex>>(
+                obj, pb_.get_binding((Tex*)nullptr));
         set_texture_property(name, r);
         prop_updater[name] = [&obj, &r]() {
-            provider<T, render_assets::texture2d>::update(obj, r, false);
+            provider<T, Tex>::update(obj, r, false);
         };
     }
 
-    void set_tex2d_property(const std::string& name, render_assets::texture2d& tex) {
-        shader_render_task::set_property(name, tex);
+    void set_texture_property(const std::string& name, render_assets::texture& tex) {
+        shader_render_task::set_texture_property(name, tex);
     }
 
     void update() const {
@@ -286,8 +288,9 @@ public:
             .function("set_shader", &provided_render_task::set_shader<shader_info>)
             .function("set_property", &provided_render_task::set_property<dynamic_property>)
             .function("set_attributes", &provided_render_task::set_attributes<mesh_indexed>)
-            .function("set_texture2d_image", &provided_render_task::set_tex2d_property<image>)
-            .function("set_texture2d", static_cast<void(provided_render_task::*)(const std::string&, render_assets::texture2d&)>(&provided_render_task::set_tex2d_property))
+            .function("set_texture2d_image", &provided_render_task::set_texture_property<render_assets::texture2d, image>)
+            .function("set_texture_cubemap_image", &provided_render_task::set_texture_property<render_assets::texture_cubemap, image>)
+            .function("set_texture", static_cast<void(provided_render_task::*)(const std::string&, render_assets::texture&)>(&provided_render_task::set_texture_property))
             .function("set_target", static_cast<void(provided_render_task::*)(render_target&)>(&provided_render_task::set_target));
     }
 };

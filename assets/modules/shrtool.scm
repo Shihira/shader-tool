@@ -27,6 +27,17 @@
         name
         ".obj"))))
 
+(define-public built-in-image
+  (lambda (name)
+    (image-from-ppm
+      (string-append
+        (getenv "SHRTOOL_ASSETS_DIR")
+        file-name-separator-string
+        "textures"
+        file-name-separator-string
+        name
+        ".ppm"))))
+
 (define eval-counter 1)
 
 (define find-var ;eval in interaction-environment

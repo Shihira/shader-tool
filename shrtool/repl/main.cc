@@ -135,9 +135,10 @@ void has_input(char* line)
     } else {
         rl_callback_handler_install(DEFAULT_PROMPT, has_input);
 
-        for(char& c : full_input) c = c == '\n' ? ' ' : c;
+        for(char& c : full_input)
+            c = c == '\n' ? ' ' : c;
         add_history(full_input.c_str());
-
+        next_history();
         full_input.clear();
     }
 }

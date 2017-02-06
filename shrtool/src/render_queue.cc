@@ -52,20 +52,14 @@ void queue_render_task::sort() {
 
 void shader_render_task::set_property(const std::string& name,
         render_assets::property_buffer& p) {
-    prop_maybe pm;
-    pm.what = prop_maybe::PROP_BUF;
-    pm.value.prop_buf = &p;
-    prop_[name] = pm;
+    prop_[name] = &p;
 
     prop_buf_ref_changed = true;
 }
 
-void shader_render_task::set_property(const std::string& name,
+void shader_render_task::set_texture_property(const std::string& name,
         render_assets::texture& p) {
-    prop_maybe pm;
-    pm.what = prop_maybe::TEX;
-    pm.value.tex = &p;
-    prop_[name] = pm;
+    prop_tex_[name] = &p;
 
     prop_buf_ref_changed = true;
 }
@@ -77,12 +71,11 @@ void shader_render_task::render() const {
     IF_FALSE_RET(prop_.size())
 
     if(prop_buf_ref_changed) {
-        for(auto& e : prop_) {
-            if(e.second.what == prop_maybe::PROP_BUF)
-                shr_->property(e.first, *e.second.value.prop_buf);
-            if(e.second.what == prop_maybe::TEX)
-                shr_->property(e.first, *e.second.value.tex);
-        }
+        for(auto& e : prop_tex_)
+            shr_->property(e.first, *e.second);
+        for(auto& e : prop_)
+            shr_->property(e.first, *e.second);
+
         prop_buf_ref_changed = false;
     }
 

@@ -214,6 +214,23 @@ struct provider<InputType, render_assets::texture2d> {
     }
 };
 
+template<typename InputType>
+struct provider<InputType, render_assets::texture_cubemap> {
+    typedef render_assets::texture_cubemap output_type;
+    typedef InputType input_type;
+
+    DEF_LOAD_FUNC
+
+    template<typename Trait = texture2d_trait<input_type>>
+    static void update(input_type& i, output_type& p, bool anew) {
+        if(anew) {
+            p.width(Trait::width(i));
+            p.height(Trait::height(i) / 6);
+            p.fill(Trait::data(i), Trait::format(i));
+        }
+    }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename InputType>

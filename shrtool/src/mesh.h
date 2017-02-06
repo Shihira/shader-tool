@@ -193,6 +193,7 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
             uvs.size() > 0;
     }
 
+    // default constructor: initialize storage
     mesh_indexed(bool init_stor = true) :
         positions(stor_positions),
         normals(stor_normals),
@@ -224,6 +225,7 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
             size_t tesel_u, size_t tesel_v, bool smooth = true);
     static mesh_indexed gen_plane(double w, double h,
             size_t tesel_u, size_t tesel_v);
+    static mesh_indexed gen_box(double l, double w, double h);
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<mesh_indexed>("mesh")
@@ -233,6 +235,7 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
             .function("triangles", static_cast<size_t (mesh_indexed::*)() const>(&mesh_indexed::triangles))
             .function("vertices", static_cast<size_t (mesh_indexed::*)() const>(&mesh_indexed::vertices))
             .function("gen_uv_sphere", gen_uv_sphere)
+            .function("gen_box", gen_box)
             .function("gen_plane", gen_plane);
     }
 };
@@ -253,6 +256,13 @@ struct mesh_plane : mesh_indexed {
     mesh_plane(mesh_plane&& mp) : mesh_indexed(std::move(mp)) { }
 };
 
+struct mesh_box : mesh_indexed {
+    mesh_box(double l, double w, double h);
+
+    mesh_box(const mesh_box& mb) : mesh_indexed(mb) { }
+    mesh_box(mesh_box&& mb) : mesh_indexed(std::move(mb)) { }
+};
+
 inline mesh_indexed mesh_indexed::gen_uv_sphere(double radius,
         size_t tesel_u, size_t tesel_v, bool smooth) {
     return mesh_uv_sphere(radius, tesel_u, tesel_v, smooth);
@@ -260,6 +270,9 @@ inline mesh_indexed mesh_indexed::gen_uv_sphere(double radius,
 inline mesh_indexed mesh_indexed::gen_plane(double w, double h,
         size_t tesel_u, size_t tesel_v) {
     return mesh_plane(w, h, tesel_u, tesel_v);
+}
+inline mesh_indexed mesh_indexed::gen_box(double l, double w, double h) {
+    return mesh_box(l, w, h);
 }
 
 // well 

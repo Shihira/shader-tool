@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "reflection.h"
+#include "exception.h"
 
 /*
  * NOTE: A render asset must not contain the reference of another.
@@ -51,10 +52,22 @@ private:
     mutable id_type id_ = 0;
 };
 
+#define LAZEOBJ_SCALAR_PROP(type, name, def) \
+    protected: type name##_ = def; \
+    public: type name() const { return name##_; } \
+    public: \
+    void name(type t) { \
+        if(!vacuum() && name##_ != t) \
+            throw restriction_error(#name " can no longer be changed"); \
+        name##_ = t; \
+    }
+
 ////////////////////////////////////////////////////////////////////////////////
 // render assets
 
 namespace render_assets {
+
+struct texture_policy_i;
 
 class texture : public lazy_id_object_<texture> {
 public:
@@ -64,54 +77,82 @@ public:
     };
 
     enum format {
+        // DEFAULT_FMT means that an unspecified format field will reference to
+        // another specified field. If none is specified, it is equivalent to
+        // RGBA_U8888.
         DEFAULT_FMT,
         RGBA_U8888,
         R_F32,
         DEPTH_F32,
     };
 
+    enum traits {
+        NONE = 0,
+        LAYERED = 1,
+        CUBEMAP = 2,
+    };
+
+    /*
+     * texture base is not allow to be copied, for this may drop virtual
+     * functions
+     */
     id_type create_object() const;
     void destroy_object(id_type i) const;
 
-protected:
-    unsigned level_ = 0;
-    filter_type _filter = NEAREST;
-    format format_ = DEFAULT_FMT;
+    LAZEOBJ_SCALAR_PROP(size_t, level, 0)
+    LAZEOBJ_SCALAR_PROP(size_t, width, 0)
+    LAZEOBJ_SCALAR_PROP(size_t, height, 0)
+    LAZEOBJ_SCALAR_PROP(size_t, depth, 0)
+    LAZEOBJ_SCALAR_PROP(format, internal_format, DEFAULT_FMT)
+    LAZEOBJ_SCALAR_PROP(filter_type, filter, LINEAR)
+    LAZEOBJ_SCALAR_PROP(traits, trait, NONE)
 
 public:
-    unsigned level() const { return level_; }
-    void level(unsigned l) { level_ = l; }
-    format internal_format() const { return format_; }
-    void internal_format(format f);
-    filter_type filter() const { return _filter; }
-    void filter(filter_type f) { _filter = f; }
+    texture(texture&& tex) = delete;
+    texture(const texture& tex) = delete;
 
-    virtual void bind_to(size_t tex_bind) const = 0;
+    texture(size_t width = 0, size_t height = 0, format ifmt = DEFAULT_FMT)
+        : texture(width, height, 1, ifmt) { }
+    texture(size_t width, size_t height, size_t depth, format ifmt = DEFAULT_FMT)
+        : width_(width), height_(height), depth_(depth), internal_format_(ifmt) { }
+
+    virtual void fill(const void* data, format fmt = DEFAULT_FMT);
+    void reserve(format fmt = DEFAULT_FMT) { fill(nullptr, fmt); }
+
+    virtual void fill_rect(
+            size_t offx, size_t offy, size_t offz,
+            size_t w, size_t h, size_t d,
+            const void* data, format fmt = DEFAULT_FMT);
+    void fill_rect(
+            size_t w, size_t h, size_t d,
+            const void* data, format fmt = DEFAULT_FMT) {
+        fill_rect(0, 0, 0, w, h, d, data, fmt);
+    }
+    void fill_rect(
+            size_t offx, size_t offy, size_t w, size_t h,
+            const void* data, format fmt = DEFAULT_FMT) {
+        fill_rect(offx, offy, 0, w, h, 1, data, fmt);
+    }
+    void fill_rect(size_t w, size_t h,
+            const void* data, format fmt = DEFAULT_FMT) {
+        fill_rect(0, 0, w, h, data, fmt);
+    }
+
+    virtual void read(void* data, format fmt = DEFAULT_FMT);
+
+    virtual void bind_to(size_t tex_bind) const;
+    virtual void attach_to(size_t tex_attachment);
 };
 
 class texture2d : public texture {
-    size_t w_;
-    size_t h_;
-    bool filled_ = false;
-
 public:
-    texture2d(size_t width = 0, size_t height = 0, format ifmt = DEFAULT_FMT) :
-        w_(width), h_(height) {
-        internal_format(ifmt);
+    texture2d(texture2d&& tex) :
+            texture2d(tex.width(), tex.height(), tex.internal_format()) {
+        lazy_id_object_<texture>::operator=(std::move(tex));
     }
-    void reserve() { if(!filled_) fill(nullptr, internal_format()); }
-    void fill(const void* data, format fmt);
-    void read(void* data, format fmt);
 
-    size_t width() const { return w_; }
-    size_t height() const { return h_; }
-    void width(size_t w);
-    void height(size_t h);
-
-    // there is a texture limitation for each render pass in graphical dirvers
-    // this is for binding textures to a number for the current render pass
-    // usually called by shader::draw
-    virtual void bind_to(size_t tex_bind) const;
+    texture2d(size_t width = 0, size_t height = 0, format ifmt = DEFAULT_FMT)
+        : texture(width, height, ifmt) { }
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<texture2d>("texture2d")
@@ -122,26 +163,35 @@ public:
     }
 };
 
-class texture_cubemap2d : public texture {
-    size_t edge_len_;
-
+class texture_cubemap : public texture {
 public:
-    enum face_index {
-        FRONT, BACK,
-        TOP, BOTTOM,
-        LEFT, RIGHT,
-    };
-
-    texture_cubemap2d(size_t edge_len = 0, format ifmt = DEFAULT_FMT) :
-        edge_len_(edge_len) {
-        internal_format(ifmt);
+    texture_cubemap(texture_cubemap&& tex) :
+            texture_cubemap(tex.width(), tex.internal_format()) {
+        lazy_id_object_<texture>::operator=(std::move(tex));
     }
 
-    void fill(face_index f, void* data, format fmt);
-    size_t edge_length() const { return edge_len_; }
+    enum face_index : size_t {
+        POS_X = 0, NEG_X = 1,
+        POS_Y = 2, NEG_Y = 3,
+        POS_Z = 4, NEG_Z = 5,
+    };
 
-    virtual void bind_to(size_t tex_bind) const;
+    texture_cubemap(size_t edge_len = 0, format ifmt = DEFAULT_FMT) :
+            texture(edge_len, edge_len, 6, ifmt) {
+        trait(CUBEMAP);
+    }
+
+    virtual void fill(const void* data, format fmt = DEFAULT_FMT) override;
+
+    virtual void fill_rect(
+            size_t offx, size_t offy, size_t offz,
+            size_t w, size_t h, size_t d,
+            const void* data, format fmt = DEFAULT_FMT) override;
+
+    virtual void read(void* data, format fmt = DEFAULT_FMT) override;
 };
+
+////////////////////////////////////////////////////////////////////////////////
 
 namespace element_type {
     enum element_type_e {

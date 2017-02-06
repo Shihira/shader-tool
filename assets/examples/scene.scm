@@ -3,7 +3,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-model
 ; (mesh-gen-uv-sphere 2 20 10 #t))
- (vector-ref (built-in-model "teapot") 0))
+ (mesh-gen-box 2 2 2))
+; (vector-ref (built-in-model "teapot") 0))
 (display main-model)
 (newline)
 
@@ -32,7 +33,8 @@
 (display (propset-definition propset-material "prop_illum"))
 (newline)
 
-(define matrix-model (mat-eye 4))
+(define matrix-model (mat* (mat-rotate-4 'x (/ pi -6))
+                      (mat-rotate-4 'y (/ pi 6))))
 (define matrix-view (mat-translate-4 0 0 -5))
 (define matrix-projection (mat-perspective-4 (/ pi 2) (/ 4 3) 1 100))
 

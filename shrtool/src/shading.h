@@ -52,7 +52,7 @@ public:
     };
 
     // function render_Texture may alter viewport
-    void render_texture(buffer_attachment ba, render_assets::texture2d& tex);
+    void render_texture(buffer_attachment ba, render_assets::texture& tex);
     void set_viewport(size_t x, size_t y, size_t w, size_t h);
     void clear_buffer(buffer_attachment ba);
     void initial_depth(float d) { init_depth_ = d; }

@@ -6,6 +6,7 @@
 #include "traits.h"
 #include "reflection.h"
 #include "render_assets.h"
+#include "exception.h"
 
 namespace shrtool {
 
@@ -122,7 +123,7 @@ class image {
 
     mutable color* data_ = nullptr;
     // mark that if data_ should be deleted on destruction
-    bool data_internal_ = false;
+    bool data_internal_ = true;
 
     color* lazy_data_() const;
 
@@ -132,13 +133,14 @@ public:
 
     // create an new image
     image(size_t w = 0, size_t h = 0, color* data_ = nullptr) :
-        width_(w), height_(h), data_(data_), data_internal_(data_) { }
+        width_(w), height_(h), data_(data_), data_internal_(!data_) { }
     image(const image& rhs) : width_(rhs.width_), height_(rhs.height_) {
         std::copy(rhs.begin(), rhs.end(), begin());
     }
     image(image&& rhs) : width_(rhs.width_), height_(rhs.height_) {
         // we cannot call data() here. just keep the current state.
         std::swap(data_, rhs.data_);
+        std::swap(data_internal_, rhs.data_internal_);
     }
 
     image& operator=(const image& rhs) {
@@ -152,6 +154,7 @@ public:
         width_ = rhs.width_;
         height_ = rhs.height_;
         std::swap(data_, rhs.data_);
+        std::swap(data_internal_, rhs.data_internal_);
         return *this;
     }
 
@@ -182,6 +185,16 @@ public:
     ~image() {
         if(data_ && data_internal_) delete[] data_;
     }
+
+    void copy_pixel(size_t offx, size_t offy, size_t w, size_t h,
+            image& dest, size_t dest_x, size_t dest_y) const;
+
+    /* Many cubemap images have layouts as such:
+     *    +Y
+     * -Z -X +Z +X
+     *    -Y
+     */
+    static image load_cubemap_from(const image& img);
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<image>("image")

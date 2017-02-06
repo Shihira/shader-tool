@@ -26,13 +26,10 @@ DEF_ENUM_MAP(em_format_, texture::format, GLenum, ({
         { texture::DEPTH_F32, GL_DEPTH_COMPONENT32F },
     }))
 
-DEF_ENUM_MAP(em_component_, texture_cubemap2d::face_index, GLenum, ({
-        { texture_cubemap2d::FRONT,  GL_TEXTURE_CUBE_MAP_POSITIVE_Z },
-        { texture_cubemap2d::BACK,   GL_TEXTURE_CUBE_MAP_NEGATIVE_Z },
-        { texture_cubemap2d::TOP,    GL_TEXTURE_CUBE_MAP_POSITIVE_Y },
-        { texture_cubemap2d::BOTTOM, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y },
-        { texture_cubemap2d::LEFT,   GL_TEXTURE_CUBE_MAP_POSITIVE_X },
-        { texture_cubemap2d::RIGHT,  GL_TEXTURE_CUBE_MAP_NEGATIVE_X },
+DEF_ENUM_MAP(em_format_size_, texture::format, size_t, ({
+        { texture::RGBA_U8888, 4 },
+        { texture::R_F32, 4 },
+        { texture::DEPTH_F32, 4 },
     }))
 
 DEF_ENUM_MAP(em_buffer_usage_, uint32_t, GLenum, ({
@@ -55,90 +52,266 @@ DEF_ENUM_MAP(em_filter_type_, texture::filter_type, GLenum, ({
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#define __DEF_GEN_DEL_CONSTRUCT_OBJECT(cls, glgenfunc, gldelfunc) \
-    id_type cls::create_object() const \
-        { GLuint i; glgenfunc(1, &i); return i; } \
-    void cls::destroy_object(id_type i) const \
-        { gldelfunc(1, &i); }
+id_type texture::create_object() const
+{
+    GLuint i;
+    glGenTextures(1, &i);
+    return i;
+}
 
-__DEF_GEN_DEL_CONSTRUCT_OBJECT(texture, glGenTextures, glDeleteTextures)
-__DEF_GEN_DEL_CONSTRUCT_OBJECT(buffer, glGenBuffers, glDeleteBuffers)
+void texture::destroy_object(id_type i) const
+{
+    glDeleteTextures(1, &i);
+}
+
+id_type buffer::create_object() const
+{
+    GLuint i;
+    glGenBuffers(1, &i);
+    return i;
+}
+
+void buffer::destroy_object(id_type i) const
+{
+    glDeleteBuffers(1, &i);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void texture2d::fill(const void* data, format fmt) {
-    if(!width() || !height())
-        throw restriction_error("Size of textures cannot be zero");
+GLenum get_texture_type(const texture& t)
+{
+    if(t.trait() == texture::CUBEMAP)
+        return GL_TEXTURE_CUBE_MAP;
 
-    glBindTexture(GL_TEXTURE_2D, id());
-    format ifmt = internal_format() == DEFAULT_FMT ? fmt : internal_format();
-    glTexImage2D(
-            GL_TEXTURE_2D, level(),
-            em_format_(ifmt),
-            width(), height(), 0,
+    if(t.trait() == texture::LAYERED) {
+        if(t.depth() == 1)
+            return GL_TEXTURE_1D_ARRAY;
+        else
+            return GL_TEXTURE_2D_ARRAY;
+    } else {
+        if(t.depth() == 1)
+            return GL_TEXTURE_2D;
+        else
+            return GL_TEXTURE_3D;
+    }
+}
+
+void generic_fill(texture& t, const void* data, texture::format fmt,
+        GLenum tex_type, GLenum bind_tex_type, size_t dim, bool opt = true)
+{
+    bool first_time = t.vacuum();
+
+    if(first_time) {
+        if(!t.width() * t.height() * t.depth())
+            throw restriction_error("Size of texture cannot be zero");
+
+        if(t.internal_format() == texture::DEFAULT_FMT) {
+            if(fmt == texture::DEFAULT_FMT)
+                fmt = texture::RGBA_U8888;
+            t.internal_format(fmt);
+        }
+    }
+
+    glBindTexture(bind_tex_type, t.id());
+
+    if(fmt == texture::DEFAULT_FMT)
+        fmt = t.internal_format();
+
+    if(dim == 1)
+        glTexImage1D(
+            tex_type, t.level(),
+            em_format_(t.internal_format()),
+            t.width(), 0,
             em_format_component_(fmt),
             em_format_type_(fmt),
             data
         );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-            em_filter_type_(filter()));
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-            em_filter_type_(filter()));
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, GL_NONE);
-    filled_ = true;
+    else if(dim == 2)
+        glTexImage2D(
+            tex_type, t.level(),
+            em_format_(t.internal_format()),
+            t.width(), t.height(), 0,
+            em_format_component_(fmt),
+            em_format_type_(fmt),
+            data
+        );
+    else if(dim == 3)
+        glTexImage3D(
+            tex_type, t.level(),
+            em_format_(t.internal_format()),
+            t.width(), t.height(), t.depth(), 0,
+            em_format_component_(fmt),
+            em_format_type_(fmt),
+            data
+        );
+
+    if(first_time && opt) {
+        glTexParameteri(bind_tex_type, GL_TEXTURE_MAG_FILTER,
+                em_filter_type_(t.filter()));
+        glTexParameteri(bind_tex_type, GL_TEXTURE_MIN_FILTER,
+                em_filter_type_(t.filter()));
+        if(data) glGenerateMipmap(bind_tex_type);
+    }
+
+    glBindTexture(bind_tex_type, GL_NONE);
 }
 
-void texture::internal_format(format f) {
-    if(!vacuum() && format_ != f)
-        throw restriction_error("Texture format cannot be changed.");
-    format_ = f;
+void generic_fill_rect(texture& t,
+        size_t offx, size_t offy, size_t offz,
+        size_t w, size_t h, size_t d,
+        const void* data, texture::format fmt, GLenum tex_type, size_t dim)
+{
+    if(t.vacuum())
+        throw restriction_error("Texture is not yet initailized.");
+    if(offx + w > t.width() || offy + h > t.height() || offz + d > t.depth())
+        throw restriction_error("Out of bound");
+
+    if(fmt == texture::DEFAULT_FMT)
+        fmt = t.internal_format();
+
+    if(dim == 1)
+        glTexSubImage1D(
+            tex_type, t.level(),
+            offx, w,
+            em_format_component_(fmt),
+            em_format_type_(fmt),
+            data
+        );
+    else if(dim == 2)
+        glTexSubImage2D(
+            tex_type, t.level(),
+            offx, offy, w, h,
+            em_format_component_(fmt),
+            em_format_type_(fmt),
+            data
+        );
+    else if(dim == 3)
+        glTexSubImage3D(
+            tex_type, t.level(),
+            offx, offy, offz, w, h, d,
+            em_format_component_(fmt),
+            em_format_type_(fmt),
+            data
+        );
 }
 
-void texture2d::width(size_t w) {
-    if(!vacuum() && w_ != w)
-        throw restriction_error("Texture size cannot be changed.");
-    w_ = w;
-}
+void generic_read(texture& t,
+        void* data, texture::format fmt, GLenum tex_type)
+{
+    if(t.vacuum())
+        throw restriction_error("Texture is not yet initailized.");
 
-void texture2d::height(size_t h) {
-    if(!vacuum() && h_ != h)
-        throw restriction_error("Texture size cannot be changed.");
-    h_ = h;
-}
+    if(fmt == texture::DEFAULT_FMT)
+        fmt = t.internal_format();
 
-void texture2d::read(void* data, format fmt) {
-    glBindTexture(GL_TEXTURE_2D, id());
-    glGetTexImage(GL_TEXTURE_2D, 0,
+    glBindTexture(tex_type, t.id());
+    glGetTexImage(tex_type, 0,
             em_format_component_(fmt), em_format_type_(fmt), data);
-    glBindTexture(GL_TEXTURE_2D, GL_NONE);
+    glBindTexture(tex_type, GL_NONE);
 }
 
-void texture_cubemap2d::fill(face_index f, void* data, format fmt) {
-    GLuint target = em_component_(f);
+void texture::fill(const void* data, format fmt) {
+    GLenum tex_type = get_texture_type(*this);
 
-    glBindTexture(target, id());
-    format ifmt = internal_format() == DEFAULT_FMT ? fmt : internal_format();
-    glTexImage2D(
-            target, level(),
-            em_format_(ifmt),
-            edge_length(), edge_length(), 0,
-            em_format_component_(fmt),
-            em_format_type_(fmt),
-            data
-        );
-    glBindTexture(target, GL_NONE);
+    if(depth() == 1)
+        generic_fill(*this, data, fmt, tex_type, tex_type, 2);
+    else if(depth() > 1)
+        generic_fill(*this, data, fmt, tex_type, tex_type, 3);
 }
 
-void texture2d::bind_to(size_t tex_bind) const {
+void texture::fill_rect(
+        size_t offx, size_t offy, size_t offz,
+        size_t w, size_t h, size_t d,
+        const void* data, format fmt)
+{
+    GLenum tex_type = get_texture_type(*this);
+    glBindTexture(tex_type, id());
+    if(depth() == 1)
+        generic_fill_rect(*this, offx, offy, offz, w, h, d, data, fmt,
+            tex_type, 2);
+    else if(depth() > 1)
+        generic_fill_rect(*this, offx, offy, offz, w, h, d, data, fmt,
+            tex_type, 3);
+    glBindTexture(tex_type, GL_NONE);
+}
+
+void texture::read(void* data, texture::format fmt)
+{
+    generic_read(*this, data, fmt, get_texture_type(*this));
+}
+
+void texture::bind_to(size_t tex_bind) const
+{
     glActiveTexture(GL_TEXTURE0 + tex_bind);
-    glBindTexture(GL_TEXTURE_2D, id());
+    glBindTexture(get_texture_type(*this), id());
 }
 
-void texture_cubemap2d::bind_to(size_t tex_bind) const {
-    glActiveTexture(GL_TEXTURE0 + tex_bind);
+void texture::attach_to(size_t tex_attachment)
+{
+    if(vacuum())
+        reserve();
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, tex_attachment,
+            get_texture_type(*this), id(), 0);
+}
+
+void texture_cubemap::fill(const void* data, format fmt) {
+    if(depth() != 6)
+        throw restriction_error("Cubemap must has a depth of 6");
+
+    bool first_time = vacuum();
+    const uint8_t* ptr_data = (const uint8_t*) data;
+    size_t size = em_format_size_(fmt) * width() * height();
+
+    for(size_t i = 0; i < 6; i++) {
+        // increase data pointer, except that data is null
+        generic_fill(*this, data ? ptr_data + i * size : data,
+                fmt, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                GL_TEXTURE_CUBE_MAP, 2, i == 5);
+    }
+
     glBindTexture(GL_TEXTURE_CUBE_MAP, id());
+    if(data) glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S,  
+            GL_CLAMP_TO_EDGE);  
+    glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T,  
+            GL_CLAMP_TO_EDGE);  
+    glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
 }
+
+void texture_cubemap::fill_rect(
+        size_t offx, size_t offy, size_t offz,
+        size_t w, size_t h, size_t d,
+        const void* data, format fmt)
+{
+    if(depth() != 6)
+        throw restriction_error("Cubemap must has a depth of 6");
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, id());
+
+    generic_fill_rect(*this, offx, offy, 0, w, h, 1, data, fmt,
+        GL_TEXTURE_CUBE_MAP_POSITIVE_X + offz, 2);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
+}
+
+void texture_cubemap::read(void* data, texture::format fmt)
+{
+    if(depth() != 6)
+        throw restriction_error("Cubemap must has a depth of 6");
+
+    uint8_t* ptr_data = (uint8_t*) data;
+    size_t size = em_format_size_(fmt) * width() * height();
+
+    for(size_t i = 0; i < 6; i++) {
+        generic_read(*this, ptr_data + size * i, fmt,
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i);
+    }
+
+    if(data) glGenerateMipmap(get_texture_type(*this));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 void buffer::size(size_t sz) {
     if(!vacuum() && size_ != sz)

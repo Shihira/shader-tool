@@ -14,6 +14,7 @@ DEF_ENUM_MAP(em_glsl_type_name__, layout::item_type, const char*, ({
         { layout::INT, "int" },
         { layout::FLOAT, "float" },
         { layout::TEX2D, "sampler2D" },
+        { layout::TEXCUBEMAP, "samplerCube" },
     }))
 
 

@@ -102,7 +102,7 @@ TEST_CASE(test_serialization)
     instance res_1 = meta_manager::get_meta<int>().call("__size", obj);
     assert_equal_print(res_1.get<size_t>(), sizeof(int));
 
-    int i;
+    int i = 0;
     instance ptr = instance::make(&i);
     meta_manager::get_meta<int>().call("__raw_into", obj, ptr);
     assert_equal_print(i, 24);

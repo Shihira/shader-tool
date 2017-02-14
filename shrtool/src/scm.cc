@@ -39,6 +39,10 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
         { "vertex", shader::VERTEX },
         { "fragment", shader::FRAGMENT },
         { "geometry", shader::GEOMETRY },
+
+        { "xOy", math::tf::xOy },
+        { "yOz", math::tf::yOz },
+        { "zOx", math::tf::zOx },
     }))
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -84,12 +88,27 @@ struct builtin {
         return provided_render_task(bindings);
     }
 
+    static bool instance_has_function(instance& ins, const std::string& fn,
+            bool check_ptr) {
+        return !ins.is_pointer() ? ins.get_meta().has_function(fn) :
+            ins.get_pointer_meta() && check_ptr ?
+            ins.get_pointer_meta()->has_function(fn) : false;
+    }
+
+    static std::string instance_get_type(instance& ins, bool check_ptr) {
+        return !ins.is_pointer() ? ins.get_meta().name() :
+            ins.get_pointer_meta() && check_ptr ?
+            ins.get_pointer_meta()->name() : ins.get_meta().name();
+    }
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<builtin>("builtin")
             .function("shader_from_config", shader_from_config)
             .function("image_from_ppm", image_from_ppm)
             .function("make_propset", make_propset)
             .function("make_shading_rtask", make_shading_rtask)
+            .function("instance_has_function", &instance_has_function)
+            .function("instance_get_type", &instance_get_type)
             .function("meshes_from_wavefront", meshes_from_wavefront);
     }
 };
@@ -156,8 +175,18 @@ instance scm_to_instance(SCM s)
 {
     if(scm_is_bool(s))
         return instance::make<bool>(scm_to_bool(s));
-    if(scm_is_integer(s))
-        return instance::make<int>(scm_to_int(s));
+    // although it is completely possible to support 64-bit
+    // but I would better to just stay on 32-bit, and tag a TODO
+    if(scm_is_signed_integer(s,
+            std::numeric_limits<int32_t>::min(),
+            std::numeric_limits<int32_t>::max())) {
+        return instance::make<int>(scm_to_int32(s));
+    } else if(scm_is_unsigned_integer(s,
+            std::numeric_limits<size_t>::min(),
+            std::numeric_limits<size_t>::max())) {
+        return instance::make<size_t>(scm_to_size_t(s));
+    }
+
     if(scm_is_real(s))
         return instance::make<double>(scm_to_double(s));
     if(scm_is_string(s))
@@ -222,70 +251,14 @@ SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
         instance ins = m.apply(scm_to_latin1_string(funcnm),
                 args_ptr.data(), args_ptr.size());
         return instance_to_scm(std::move(ins));
+    } catch(const error_base& e) {
+        return scm_throw(scm_from_latin1_symbol("cpp-error"),
+                SCM_LIST2(scm_from_latin1_string(e.error_name()),
+                    scm_from_latin1_string(e.what())));
     } catch(const std::exception& e) {
         return scm_throw(scm_from_latin1_symbol("cpp-error"),
-                SCM_LIST2(scm_from_latin1_string(typeid(e).name()),
-                    scm_from_latin1_string(e.what())));
+                    scm_from_latin1_string(e.what()));
     }
-}
-
-void register_function(
-        const std::string& func,
-        const std::string& typenm,
-        const std::string& funcnm)
-{
-    /*
-     * (define FUNC
-     *   (lambda args
-     *     (general-subroutine TYPENM FUNCNM args))
-     */
-
-    scm_eval(SCM_LIST3(
-            scm_from_latin1_symbol("define-public"),
-            scm_from_latin1_symbol(func.c_str()),
-            SCM_LIST3(
-                scm_from_latin1_symbol("lambda"),
-                scm_from_latin1_symbol("args"),
-                SCM_LIST4(
-                    scm_from_latin1_symbol("general-subroutine"),
-                    scm_from_latin1_string(typenm.c_str()),
-                    scm_from_latin1_string(funcnm.c_str()),
-                    scm_from_latin1_symbol("args")))),
-        scm_interaction_environment());
-}
-
-void register_constructor(std::string typenm)
-{
-    /*
-     * (define make-TYPENM
-     *   (lambda args
-     *     (general-subroutine TYPENM
-     *       (string-append "__init_"
-     *         (number->string (list-length args))) args)))
-     */
-
-    for(char& c : typenm)
-        c = c == '_' ? '-' : c;
-
-    scm_eval(SCM_LIST3(
-            scm_from_latin1_symbol("define-public"),
-            scm_from_latin1_symbol(("make-" + typenm).c_str()),
-            SCM_LIST3(
-                scm_from_latin1_symbol("lambda"),
-                scm_from_latin1_symbol("args"),
-                SCM_LIST4(
-                    scm_from_latin1_symbol("general-subroutine"),
-                    scm_from_latin1_string(typenm.c_str()),
-                    SCM_LIST3(
-                        scm_from_latin1_symbol("string-append"),
-                        scm_from_latin1_string("__init_"),
-                        SCM_LIST2(
-                            scm_from_latin1_symbol("number->string"),
-                            SCM_LIST2(
-                                scm_from_latin1_symbol("list-length"),
-                                scm_from_latin1_symbol("args")))),
-                    scm_from_latin1_symbol("args")))),
-        scm_interaction_environment());
 }
 
 void register_all()
@@ -295,23 +268,38 @@ void register_all()
 
     for(auto& m : meta_manager::meta_set()) {
         bool reged_cons = false;
+        std::string type_name = m.second.name();
 
         for(auto& f : m.second.function_set()) {
-            if(f.first.empty() && f.first[0] == '_') {
-                if(f.first.substr(0, 6) == "__init" && reged_cons) {
-                    register_constructor(m.second.name());
+            std::cout << type_name << "::" << f.first << std::endl;
+
+            if(f.first.empty())
+                continue;
+            if(f.first[0] == '_') {
+                if(f.first.length() >= 6 &&
+                        f.first.substr(0, 6) == "__init" && !reged_cons) {
+                    std::string func_name = "make-" + type_name;
+                    for(char& c : func_name) c = c == '_' ? '-' : c;
+
+                    scm_call_2(
+                        scm_c_public_ref("shrtool", "shrtool-register-constructor"),
+                        scm_from_latin1_symbol(func_name.c_str()),
+                        scm_from_latin1_string(type_name.c_str()));
                     reged_cons = true;
                 }
+                continue;
             }
 
-            std::string type_name = m.second.name();
             std::string func_name =
-                (type_name != "builtin" ? (type_name + "-") : "") +
-                f.first;
+                (type_name != "builtin" ? (type_name + "-") : "") + f.first;
             for(char& c : func_name)
                 c = c == '_' ? '-' : c;
 
-            register_function(func_name, type_name, f.first);
+            scm_call_3(
+                scm_c_public_ref("shrtool", "shrtool-register-function"),
+                scm_from_latin1_symbol(func_name.c_str()),
+                scm_from_latin1_string(type_name.c_str()),
+                scm_from_latin1_string(f.first.c_str()));
         }
     }
 }
@@ -325,16 +313,19 @@ void init_scm()
 
     scm_t::meta_reg_();
     builtin::meta_reg_();
-    shader_info::meta_reg();
     color::meta_reg_();
+    rect::meta_reg_();
     image::meta_reg_();
     mesh_indexed::meta_reg_();
+    shader_info::meta_reg_();
     dynamic_property::meta_reg_();
     render_task::meta_reg_();
     queue_render_task::meta_reg_();
     provided_render_task::meta_reg_();
-    render_target::meta_reg();
+    render_target::meta_reg_();
     render_assets::texture2d::meta_reg_();
+    camera::meta_reg_();
+    transfrm::meta_reg_();
 
     register_all();
 }

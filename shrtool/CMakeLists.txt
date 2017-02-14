@@ -4,7 +4,7 @@ find_package(GLFW REQUIRED)
 find_package(Guile REQUIRED)
 
 file(GLOB_RECURSE ALL_SOURCE src/*.cc) 
-#add_library(${PROJECT_NAME} STATIC ${ALL_SOURCE})
+
 add_library(${PROJECT_NAME} SHARED ${ALL_SOURCE})
 include_directories(${PROJECT_NAME}
     ${OpenGL_INCLUDE_DIR} ${GLEW_INCLUDE_DIR})

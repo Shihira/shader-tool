@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <cstdlib>
+#include <fstream>
 
 #include "unit_test.h"
 #include "singleton.h"
@@ -27,7 +28,7 @@ public:
 
     static void fbsize_callback(GLFWwindow* window,
             int width, int height) {
-        render_target::screen.set_viewport(0, 0, width, height);
+        render_target::screen.force_set_viewport_(rect::from_size(width, height));
     }
 
     static void init(const std::string ver_str = "330 core",
@@ -59,6 +60,8 @@ public:
 
         glfwSetKeyCallback(inst().window, key_callback);
         glfwSetFramebufferSizeCallback(inst().window, fbsize_callback);
+
+        render_target::screen.force_set_viewport_(rect::from_size(w, h));
     }
 
     static void geometry_source(size_t& w, size_t& h) {
@@ -139,15 +142,24 @@ struct singlefunc_fixture : gui_fixture_base
 
 inline std::string locate_assets(const std::string& fn)
 {
-    const char* cp = std::getenv("SHRTOOL_ASSETS_DIR");
-    if(!cp) return fn;
+    const char* pcp_1 = std::getenv("SHRTOOL_TEST_ASSETS_DIR");
+    const char* pcp_2 = std::getenv("SHRTOOL_ASSETS_DIR");
+    std::string cp_1 = pcp_1 ? pcp_1 : "";
+    std::string cp_2 = pcp_2 ? pcp_2 : "";
 
-    std::string path = cp;
-    if(path.back() == '/' || path.back() == '\\')
-        path += fn;
-    else path += "/" + fn;
+    std::string path_1 = cp_1 +
+        (cp_1.back() == '/' || cp_1.back() == '\\' ? "" : "/") + fn;
+    std::string path_2 = cp_2 +
+        (cp_1.back() == '/' || cp_1.back() == '\\' ? "" : "/") + fn;
 
-    return path;
+    std::ifstream if_1(path_1);
+    std::cout << "[C] " << path_1 << std::endl;
+    if(if_1.good()) return path_1;
+    std::cout << "[C] " << path_2 << std::endl;
+    std::ifstream if_2(path_2);
+    if(if_2.good()) return path_2;
+
+    throw std::runtime_error("Cannot read file: " + fn);
 }
 
 }

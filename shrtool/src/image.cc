@@ -3,24 +3,8 @@
 #include <sstream>
 
 #include "image.h"
-#include "exception.h"
 
 namespace shrtool {
-
-color::operator std::string() const {
-    std::stringstream ss;
-    ss << *this;
-    return ss.str();
-}
-
-std::ostream& operator<<(std::ostream& os, const color& c) {
-    std::ios::iostate s = os.rdstate();
-    os << '#' << std::setw(8)
-        << std::setfill('0')
-        << std::hex << c.data.rgba;
-    os.setstate(s);
-    return os;
-}
 
 color* image::lazy_data_() const
 {
@@ -81,9 +65,9 @@ image image::load_cubemap_from(const image& img) {
 static void load_netpbm_body_plain(std::istream& is, image& im, size_t space)
 {
 for(auto i = im.begin(); i != im.end(); ++i) {
-    uint16_t comp;
+    uint16_t channels;
     for(size_t c = 0; c < 3; ++c) {
-        is >> comp >> std::ws;
+        is >> channels >> std::ws;
 
         if(is.fail()) {
             if(is.eof()) throw parse_error(
@@ -91,12 +75,12 @@ for(auto i = im.begin(); i != im.end(); ++i) {
             else throw parse_error("Bad Netpbm image: body");
         }
 
-        uint8_t comp_byte = comp;
+        uint8_t channels_byte = channels;
         if(space > 255)
-            comp_byte = comp / ((space + 1) / 256);
+            channels_byte = channels / ((space + 1) / 256);
         else if(space < 255)
-            comp_byte = comp * 256 / (space + 1) + comp;
-        i->data.bytes[c] = comp_byte;
+            channels_byte = channels * 256 / (space + 1) + channels;
+        i->data.bytes[c] = channels_byte;
     }
 }
 }
@@ -105,9 +89,9 @@ template<typename CompT>
 static void load_netpbm_body_raw(std::istream& is, image& im, size_t space)
 {
     for(auto i = im.begin(); i != im.end(); ++i) {
-        CompT comp;
+        CompT channels;
         for(size_t c = 0; c < 3; c++) {
-            is.read((char*)(&comp), sizeof(comp));
+            is.read((char*)(&channels), sizeof(channels));
 
             if(is.fail()) {
                 if(is.eof()) throw parse_error(
@@ -115,12 +99,12 @@ static void load_netpbm_body_raw(std::istream& is, image& im, size_t space)
                 else throw parse_error("Bad Netpbm image: body");
             }
 
-            uint8_t comp_byte = comp;
+            uint8_t channels_byte = channels;
             if(space > 255)
-                comp_byte = comp / ((space + 1) / 256);
+                channels_byte = channels / ((space + 1) / 256);
             else if(space < 255)
-                comp_byte = comp * 256 / (space + 1) + comp;
-            i->data.bytes[c] = comp_byte;
+                channels_byte = channels * 256 / (space + 1) + channels;
+            i->data.bytes[c] = channels_byte;
         }
     }
 }
@@ -172,9 +156,9 @@ void image_io_netpbm::save_image(std::ostream& os, const image& im)
     os << "P6\n# created by shrtool\n"
         << im.width() << ' ' << im.height() << "\n255\n";
     for(const color& c : im) {
-        os.put(c.data.comp.r);
-        os.put(c.data.comp.g);
-        os.put(c.data.comp.b);
+        os.put(c.data.channels.r);
+        os.put(c.data.channels.g);
+        os.put(c.data.channels.b);
     }
 }
 

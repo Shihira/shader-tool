@@ -33,33 +33,18 @@
 (display (propset-definition propset-material "prop_illum"))
 (newline)
 
-(define matrix-model (mat* (mat-rotate-4 'x (/ pi -6))
-                      (mat-rotate-4 'y (/ pi 6))))
-(define matrix-view (mat-translate-4 0 0 -5))
-(define matrix-projection (mat-perspective-4 (/ pi 2) (/ 4 3) 1 100))
-
-(mat-pretty matrix-model)
-(newline)
-(mat-pretty matrix-view)
-(newline)
-(mat-pretty matrix-projection)
-(newline)
-
-(define propset-transfrm
-  (make-propset))
-(propset-resize propset-transfrm 2)
-(propset-set propset-transfrm 0 (mat* matrix-projection
-                                   matrix-view
-                                   matrix-model))
-(propset-set propset-transfrm 1 matrix-model)
-(display (propset-definition propset-transfrm "prop_illum"))
-(newline)
+(define transfrm-mesh
+  (make-transfrm))
+(transfrm-rotate transfrm-mesh (/ pi 6) 'zOx)
+(transfrm-rotate transfrm-mesh (/ pi -6) 'yOz)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define main-target
-    (render-target-screen))
-(render-target-initial-color main-target 0.2 0.2 0.2 1)
-(render-target-enable-depth-test main-target #t)
+
+(define main-cam
+  (make-camera))
+(transfrm-translate (camera-transformation main-cam) 0 0 5)
+(render-target-set-bgcolor main-cam (color-from-value #xff333333))
+(render-target-set-depth-test main-cam #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-rtask
@@ -67,7 +52,8 @@
 (shading-rtask-set-attributes main-rtask main-model)
 (shading-rtask-set-property main-rtask "material" propset-material)
 (shading-rtask-set-property main-rtask "illum" propset-illum)
-(shading-rtask-set-property main-rtask "transfrm" propset-transfrm)
+(shading-rtask-set-property-transfrm main-rtask "transfrm" transfrm-mesh)
+(shading-rtask-set-property-camera main-rtask "camera" main-cam)
 (shading-rtask-set-shader main-rtask main-shader)
-(shading-rtask-set-target main-rtask (render-target-screen))
+(shading-rtask-set-target main-rtask main-cam)
 

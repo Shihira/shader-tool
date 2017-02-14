@@ -1,9 +1,37 @@
 (define-module (shrtool))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define list-length
+  (lambda (l)
+    (cond
+      ((null? l) 0)
+      (#t (+ 1 (list-length (cdr l)))))))
+
+(define-public shrtool-register-function
+  (lambda (func typenm funcnm)
+    (eval
+      `(define-public ,func
+         (lambda args
+           (general-subroutine ,typenm ,funcnm args)))
+      (interaction-environment))))
+
+(define-public shrtool-register-constructor
+  (lambda (funcnm typenm)
+    (eval
+      `(define-public ,funcnm
+         (lambda args
+           (general-subroutine ,typenm
+             (string-append "__init_"
+               (number->string (list-length args))) args)))
+      (interaction-environment))))
+
 (load-extension "libshrtool" "shrtool_init_scm")
 
 (load "shader-def.scm")
 (load "matrix.scm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public built-in-shader
   (lambda (name)

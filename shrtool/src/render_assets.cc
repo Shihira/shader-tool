@@ -251,15 +251,17 @@ void texture::attach_to(size_t tex_attachment)
     if(vacuum())
         reserve();
 
+    GLenum tex_type = get_texture_type(*this);
+    glBindTexture(tex_type, id());
     glFramebufferTexture2D(GL_FRAMEBUFFER, tex_attachment,
-            get_texture_type(*this), id(), 0);
+            tex_type, id(), 0);
+    glBindTexture(tex_type, GL_NONE);
 }
 
 void texture_cubemap::fill(const void* data, format fmt) {
     if(depth() != 6)
         throw restriction_error("Cubemap must has a depth of 6");
 
-    bool first_time = vacuum();
     const uint8_t* ptr_data = (const uint8_t*) data;
     size_t size = em_format_size_(fmt) * width() * height();
 

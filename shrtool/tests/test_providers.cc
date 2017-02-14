@@ -208,7 +208,7 @@ TEST_CASE(test_prop_raw_data_provider) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct prop_data_3 {
-    friend class shrtool::prop_trait<prop_data_3>;
+    friend struct shrtool::prop_trait<prop_data_3>;
 
 private:
     int data;

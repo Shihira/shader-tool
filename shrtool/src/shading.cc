@@ -48,10 +48,10 @@ DEF_ENUM_MAP(em_element_type_size_, element_type::element_type_e, size_t, ({
 
 ////////////////////////////////////////////////////////////////////////////////
 
-render_target render_target::screen(true);
+render_target render_target::screen;
 
 id_type render_target::create_object() const {
-    if(isscr()) return 0;
+    if(is_screen()) return 0;
 
     GLuint i;
     glGenFramebuffers(1, &i);
@@ -59,7 +59,7 @@ id_type render_target::create_object() const {
 }
 
 void render_target::destroy_object(id_type i) const {
-    if(!isscr()) glDeleteFramebuffers(1, &i);
+    if(!is_screen()) glDeleteFramebuffers(1, &i);
 }
 
 id_type sub_shader::create_object() const {
@@ -90,40 +90,47 @@ void vertex_attr_vector::destroy_object(id_type i) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void render_target::set_viewport(size_t x, size_t y, size_t w, size_t h) {
-    viewport_[0] = x; viewport_[1] = y;
-    viewport_[2] = w; viewport_[3] = h;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, id());
-    glViewport(x, y, w, h);
-    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
-}
-
-void render_target::render_texture(
+void render_target::attach_texture(
         render_target::buffer_attachment ba,
         render_assets::texture &tex) {
+    if(this == &screen)
+        throw restriction_error("You cannot attach any "
+                "texture to the screen.");
+    tex_attachments_[ba] = &tex;
+
     glBindFramebuffer(GL_FRAMEBUFFER, id());
     tex.attach_to(em_buffer_attachment_(ba));
 
-    viewport_[0] = 0;
-    viewport_[1] = 0;
-    viewport_[2] = tex.width();
-    viewport_[3] = tex.height();
+    viewport_ = rect::from_size(tex.width(), tex.height());
 
-    glViewport(0, 0, tex.width(), tex.height());
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
-void render_target::clear_buffer(render_target::buffer_attachment ba) {
+void render_target::apply_viewport() const
+{
+    const auto& vp = viewport_;
+    glViewport(vp.tl[0], vp.tl[1],
+            vp.width(), vp.height());
+}
+
+void camera::apply_viewport() const
+{
+    render_target::screen.apply_viewport();
+}
+
+void render_target::clear_buffer(render_target::buffer_attachment ba) const {
     glBindFramebuffer(GL_FRAMEBUFFER, id());
+    apply_viewport();
     if(ba == COLOR_BUFFER) {
-        glClearBufferfv(em_clear_mask_(ba), 0, init_color_);
+        fcolor c = bgcolor_;
+        glClearBufferfv(em_clear_mask_(ba), 0, c.data.floats);
     } else if(ba > COLOR_BUFFER && ba < COLOR_BUFFER_MAX) {
+        fcolor c = bgcolor_;
         glClearBufferfv(em_clear_mask_(ba),
-                ba - COLOR_BUFFER_0, init_color_);
+                ba - COLOR_BUFFER_0, c.data.floats);
     } else if(ba == DEPTH_BUFFER) {
         glDepthFunc(GL_LESS);
-        glClearBufferfv(em_clear_mask_(ba), 0, &init_depth_);
+        glClearBufferfv(em_clear_mask_(ba), 0, &infdepth_);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
@@ -140,7 +147,7 @@ void shader::add_sub_shader(shader::sub_shader_ptr p) {
 
 void shader::property_binding(const std::string& name, size_t binding) {
     if(property_binding_.find(name) != property_binding_.end())
-        throw shader_error("Uniform" + name + "has bound.");
+        throw shader_error("Uniform " + name + " has bound.");
 
     glUseProgram(id());
     GLuint idx = glGetUniformBlockIndex(id(), name.c_str());
@@ -153,8 +160,13 @@ void shader::property_binding(const std::string& name, size_t binding) {
 
 size_t shader::property(const std::string& name,
         const render_assets::property_buffer& buf) {
+    auto i = property_binding_.find(name);
     size_t binding = max_binding_index_ + 1;
-    property_binding(name, binding);
+
+    if(i != property_binding_.end())
+        binding = i->second;
+    else property_binding(name, binding);
+
     property(binding, buf);
 
     return binding;
@@ -187,9 +199,12 @@ void shader::draw(const vertex_attr_vector& vat) const {
     glUseProgram(id());
     glBindVertexArray(vat.id());
     glBindFramebuffer(GL_FRAMEBUFFER, target_->id());
-    if(target_->is_depth_test_enabled()) {
+
+    if(target_->get_depth_test()) {
         glEnable(GL_DEPTH_TEST);
     }
+
+    target_->apply_viewport();
 
     // bind textures
     size_t tex_num = 0;

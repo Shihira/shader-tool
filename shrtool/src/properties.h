@@ -354,6 +354,9 @@ struct dynamic_property {
     bool is_changed() const { return is_changed_; }
     void mark_applied() { is_changed_ = false; }
 
+    dynamic_property() {
+    }
+
     dynamic_property& operator!() {
         is_changed_ = true;
         return *this;

@@ -85,7 +85,7 @@ struct shader_info {
         return s->make_source(*this);
     }
 
-    static void meta_reg() {
+    static void meta_reg_() {
         refl::meta_manager::reg_class<shader_info>("shader")
             .function("gen_source", &shader_info::gen_source);
     }

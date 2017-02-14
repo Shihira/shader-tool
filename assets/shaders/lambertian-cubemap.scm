@@ -3,6 +3,7 @@
 `((name . "lambertian-texture")
   ,shader-def-attr-mesh
   ,shader-def-prop-transfrm
+  ,shader-def-prop-camera
   (property-group
     (name . "illum")
     (layout
@@ -41,9 +42,9 @@
       out vec2 fragUV;
 
       void main() {
-          fragNormal = (transpose(inverse(mMatrix)) * vec4(normal, 0)).xyz;
+          fragNormal = (transpose(mMatrix_inv) * vec4(normal, 0)).xyz;
 
-          gl_Position = mvpMatrix * position;
+          gl_Position = vpMatrix * mMatrix * position;
           fragPosition = mMatrix * position;
           fragPosition /= fragPosition.w;
           fragUV = (uv / uv.z).xy;

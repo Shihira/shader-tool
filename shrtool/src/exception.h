@@ -10,12 +10,14 @@ public:
     std::string reason;
     error_base(const std::string& r) : reason(r) { }
     const char* what() const noexcept override { return reason.c_str(); }
+    virtual const char* error_name() const noexcept { return "error_base"; }
 };
 
 
 #define DEFINE_TRIVIAL_ERROR(name) \
     class name : public error_base { \
         using error_base::error_base; \
+        const char* error_name() const noexcept override { return #name; } \
     };
 
 DEFINE_TRIVIAL_ERROR(assert_error)

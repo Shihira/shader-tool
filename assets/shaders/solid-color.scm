@@ -3,6 +3,7 @@
 `((name . "solid-color")
   ,shader-def-attr-mesh
   ,shader-def-prop-transfrm
+  ,shader-def-prop-camera
   (property-group
     (name . "material")
     (layout
@@ -20,5 +21,5 @@
     (version . "330 core")
     (source . "
       void main() {
-          gl_Position = mvpMatrix * position;
+          gl_Position = vpMatrix * mMatrix * position;
       }")))

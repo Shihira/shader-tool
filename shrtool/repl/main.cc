@@ -37,7 +37,7 @@ class display_window {
 
     static void fbsize_callback(GLFWwindow* window,
             int width, int height) {
-        render_target::screen.set_viewport(0, 0, width, height);
+        render_target::screen.force_set_viewport_(rect::from_size(width, height));
     }
 
     static void do_nothing_v() { }
@@ -88,6 +88,7 @@ public:
         glfwSetFramebufferSizeCallback(window, fbsize_callback);
 
         map_[window] = this;
+        render_target::screen.force_set_viewport_(rect::from_size(w, h));
     }
 
     void main_loop() {
@@ -146,12 +147,12 @@ void has_input(char* line)
 int main(int argc, char* argv[])
 {
     scm_init_guile();
-    refl::meta_manager::init();
-    scm::init_scm();
+    //refl::meta_manager::init();
+    //scm::init_scm();
     scm_c_eval_string("(import (shrtool))");
     scm_c_eval_string("(define main-rtask #nil)");
 
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
+    render_target::screen.set_bgcolor(color(51, 51, 51));
 
     if(argc > 1)
         scm_c_primitive_load(argv[1]);

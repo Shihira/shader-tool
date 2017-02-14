@@ -3,6 +3,7 @@
 `((name . "blinn-phong")
   ,shader-def-attr-mesh
   ,shader-def-prop-transfrm
+  ,shader-def-prop-camera
   (property-group
     (name . "illum")
     (layout
@@ -49,10 +50,10 @@
       out vec3 fragNormal;
 
       void main() {
-          fragNormal = (transpose(inverse(mMatrix)) * vec4(normal, 0)).xyz;
+          fragNormal = (transpose(mMatrix_inv) * vec4(normal, 0)).xyz;
           fragNormal = normalize(fragNormal);
 
-          gl_Position = mvpMatrix * position;
+          gl_Position = vpMatrix * mMatrix * position;
           fragPosition = mMatrix * position;
           fragPosition /= fragPosition.w;
       }")))

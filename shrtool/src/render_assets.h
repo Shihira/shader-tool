@@ -10,6 +10,7 @@
 
 #include "reflection.h"
 #include "exception.h"
+#include "utilities.h"
 
 /*
  * NOTE: A render asset must not contain the reference of another.
@@ -51,6 +52,8 @@ public:
 private:
     mutable id_type id_ = 0;
 };
+
+//// macros
 
 #define LAZEOBJ_SCALAR_PROP(type, name, def) \
     protected: type name##_ = def; \
@@ -132,6 +135,10 @@ public:
             size_t offx, size_t offy, size_t w, size_t h,
             const void* data, format fmt = DEFAULT_FMT) {
         fill_rect(offx, offy, 0, w, h, 1, data, fmt);
+    }
+    void fill_rect(const rect& r,
+            const void* data, format fmt = DEFAULT_FMT) {
+        fill_rect(r.tl[0], r.tl[1], r.width(), r.height(), data, fmt);
     }
     void fill_rect(size_t w, size_t h,
             const void* data, format fmt = DEFAULT_FMT) {
@@ -319,19 +326,7 @@ public:
 
 }
 
-#define DEF_ENUM_MAP(fn, from_type, to_type, map_content) \
-    static to_type fn(from_type e) { \
-        static const std::unordered_map<from_type, to_type> \
-            trans_map_ map_content; \
-        auto i_ = trans_map_.find(e); \
-        if(i_ == trans_map_.end()) \
-            throw shrtool::enum_map_error( \
-                    std::string("Failed when mapping ") + #fn); \
-        return i_->second; \
-    }
-
 }
-
 
 
 #endif // RENDER_ASSETS_H_INCLUDED

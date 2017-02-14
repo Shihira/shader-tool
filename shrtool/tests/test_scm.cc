@@ -121,8 +121,8 @@ TEST_CASE_FIXTURE(test_scm_big_news, union_fixture) {
         ->get<provided_render_task>();
 
     draw = [&]() {
-        render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
-        render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
+        r.get_target()->clear_buffer(render_target::COLOR_BUFFER);
+        r.get_target()->clear_buffer(render_target::DEPTH_BUFFER);
 
         r.render();
     };

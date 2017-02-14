@@ -111,7 +111,7 @@ public:
 
 class shader_render_task : public render_task {
     shader* shr_ = nullptr;
-    render_target* target_ = nullptr;
+    render_target* target_;
     vertex_attr_vector* attr_ = nullptr;
     std::map<std::string, render_assets::property_buffer*> prop_;
     std::map<std::string, render_assets::texture*> prop_tex_;
@@ -119,6 +119,11 @@ class shader_render_task : public render_task {
     mutable bool prop_buf_ref_changed = true;
 
 public:
+    shader_render_task() { reset(); }
+
+    render_target* get_target() { return target_; }
+    shader* get_shader() { return shr_; }
+
     void set_shader(shader& s) {
         shr_ = &s;
         prop_buf_ref_changed = true;
@@ -128,7 +133,7 @@ public:
     void set_attributes(vertex_attr_vector& v) { attr_ = &v; }
     void reset() {
         shr_ = nullptr;
-        target_ = nullptr;
+        target_ = &render_target::screen;
         attr_ = nullptr;
         prop_.clear();
         prop_buf_ref_changed = true;
@@ -219,17 +224,6 @@ public:
         };
     }
 
-    using shader_render_task::set_target;
-    template<typename T>
-    void set_target(T& obj) {
-        render_target& r = provider_bindings::set_binding
-            <provider<T, render_target>>(obj, pb_.target_bindings);
-        set_target(r);
-        target_updater = [&obj, &r]() {
-            provider<T, render_target>::update(obj, r, false);
-        };
-    }
-
     using shader_render_task::set_attributes;
     template<typename T>
     void set_attributes(T& obj) {
@@ -287,6 +281,8 @@ public:
             .enable_base<render_task>()
             .function("set_shader", &provided_render_task::set_shader<shader_info>)
             .function("set_property", &provided_render_task::set_property<dynamic_property>)
+            .function("set_property_camera", &provided_render_task::set_property<camera>)
+            .function("set_property_transfrm", &provided_render_task::set_property<transfrm>)
             .function("set_attributes", &provided_render_task::set_attributes<mesh_indexed>)
             .function("set_texture2d_image", &provided_render_task::set_texture_property<render_assets::texture2d, image>)
             .function("set_texture_cubemap_image", &provided_render_task::set_texture_property<render_assets::texture_cubemap, image>)

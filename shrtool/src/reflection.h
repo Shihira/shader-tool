@@ -198,13 +198,15 @@ struct meta_manager : generic_singleton<meta_manager> {
     template<typename T>
     static meta& get_meta() {
         auto m = find_meta<T>();
-        if(!m) throw not_found_error("Type has not yet been registered.");
+        if(!m) throw not_found_error(std::string("Type ") +
+                typeid(T).name() + " has not yet been registered.");
         return *m;
     }
 
     static meta& get_meta(const std::string& s) {
         auto m = find_meta(s);
-        if(!m) throw not_found_error("Type has not yet been registered.");
+        if(!m) throw not_found_error("Type " + s +
+                " has not yet been registered.");
         return *m;
     }
 
@@ -343,8 +345,8 @@ struct instance {
      * Note: when you specify type T manually, remember not to bring * along.
      */
     template<typename T>
-    static instance make(T* p) {
-        instance i = make<void*, void>(reinterpret_cast<T*>(p));
+    static instance make(const T* p) {
+        instance i = make<void*, void>(const_cast<T*>(p));
         i.ptrm = meta_manager::find_meta<T>();
         return std::move(i);
     }
@@ -387,13 +389,15 @@ struct instance {
             return p->data;
         }
 
-        if(m->is_same<void*>() && (!ptrm || ptrm->is_same<T>())) {
+        if(is_pointer() && (!ptrm || ptrm->is_same<T>() ||
+                std::is_same<T, void*>::value)) {
             auto p = dynamic_cast<typed_instance_stor<void*>*>(stor.get());
             if(!p) throw restriction_error("Conversion failed");
             return *reinterpret_cast<T*>(p->data);
         }
 
-        throw type_matching_error("Type not match");
+        throw type_matching_error("Type not matched: " + m->name() +
+                (ptrm ? ":" + ptrm->name() : ""));
     }
 
     instance cast_to(const meta& rm) const {
@@ -483,6 +487,21 @@ struct ret_type_<instance> {
     }
 };
 
+template<typename T, size_t M, size_t N>
+struct ret_type_<math::matrix<T, M, N>> {
+    static instance convert(math::matrix<T, M, N>&& ins) {
+        return instance::make<math::dynmatrix<T>>(std::move(ins));
+    }
+};
+
+template<typename T, size_t M, size_t N>
+struct ret_type_<math::matrix<T, M, N>&> {
+    static instance convert(math::matrix<T, M, N>& ins) {
+        return instance::make<math::dynmatrix<T>>(
+            math::dynmatrix<T>::agent(M, N, ins.data()));
+    }
+};
+
 template<typename T>
 struct arg_type_ {
     instance tmp;
@@ -499,7 +518,7 @@ struct arg_type_ {
 
         if(tmp.is_pointer() && tmp.get_pointer_meta() &&
                 *tmp.get_pointer_meta() == target_m) {
-            return *reinterpret_cast<pure_t*>(t.get<void*>());
+            return *reinterpret_cast<pure_t*>(tmp.get<void*>());
         } else
             return tmp.get<pure_t>();
     }
@@ -535,6 +554,30 @@ struct arg_type_<T&&> : arg_type_<T&> {
     typedef typename std::remove_cv<T>::type pure_t;
     pure_t&& convert(instance& t) {
         return std::move(arg_type_<T&>::convert(t));
+    }
+};
+
+template<typename T, size_t M, size_t N>
+struct arg_type_<math::matrix<T, M, N>&> {
+    typedef math::matrix<T, M, N> pure_t;
+    math::matrix<T, M, N> m;
+    pure_t& convert(instance& t) {
+        if(!t.get_meta().is_same<math::dynmatrix<T>>())
+            throw type_matching_error("Not a matrix");
+        m = t.get<math::dynmatrix<T>>();
+        return m;
+    }
+};
+
+template<typename T, size_t M, size_t N>
+struct arg_type_<math::matrix<T, M, N>> {
+    typedef math::matrix<T, M, N> pure_t;
+    math::matrix<T, M, N> m;
+    pure_t& convert(instance& t) {
+        if(!t.get_meta().is_same<math::dynmatrix<T>>())
+            throw type_matching_error("Not a matrix");
+        m = t.get<math::dynmatrix<T>>();
+        return m;
     }
 };
 
@@ -662,9 +705,13 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
 #ifdef LOG_REFL_CALLING
     std::cout << "Calling " << this->name()
         << "::" << name << '(' << std::flush;
-    for(size_t e = 0; e < n; e++)
-        std::cout << i[e]->get_meta().name()
-            << (e == n - 1 ? "" : ", ") << std::flush;
+    for(size_t e = 0; e < n; e++) {
+        std::cout << i[e]->get_meta().name();
+        if(i[e]->is_pointer())
+            std::cout << ":" << (i[e]->get_pointer_meta() ?
+                i[e]->get_pointer_meta()->name() : "void");
+        std::cout << (e == n - 1 ? "" : ", ") << std::flush;
+    }
     std::cout << ")" << std::endl;
 #endif
 
@@ -677,8 +724,15 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
 #ifdef LOG_REFL_CALLING
     std::cout << "Exiting " << this->name()
         << "::" << name << " -> " << std::flush;
-    if(ins.is_null()) std::cout << "void" << std::endl;
-    else std::cout << ins.get_meta().name() << std::endl;
+    if(ins.is_null())
+        std::cout << "void" << std::endl;
+    else {
+        std::cout << ins.get_meta().name();
+        if(ins.is_pointer())
+            std::cout << ":" << (ins.get_pointer_meta() ?
+                ins.get_pointer_meta()->name() : "void");
+        std::cout << std::endl;
+    }
 #endif
 
     return std::move(ins);

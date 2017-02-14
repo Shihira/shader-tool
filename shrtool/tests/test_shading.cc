@@ -15,7 +15,7 @@ size_t ctsize(const T& ct) {
 }
 
 TEST_CASE_FIXTURE(test_rectangle, singlefunc_fixture) {
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
+    render_target::screen.set_bgcolor(color(51, 51, 51));
 
     shader shr;
     sub_shader& vs = shr.add_sub_shader(shader::VERTEX);
@@ -224,8 +224,8 @@ const size_t cube_uindices[cube_num_vertices] = {
 };
 
 TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
-    render_target::screen.enable_depth_test(true);
+    render_target::screen.set_bgcolor(color(51, 51, 51));
+    render_target::screen.set_depth_test(true);
 
     shader shr;
     sub_shader& vs = shr.add_sub_shader(shader::VERTEX);
@@ -394,8 +394,8 @@ void main() {
 )EOF";
 
 TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
-    render_target::screen.enable_depth_test(true);
+    render_target::screen.set_bgcolor(color(51, 51, 51));
+    render_target::screen.set_depth_test(true);
 
     shader shr;
     sub_shader& vs = shr.add_sub_shader(shader::VERTEX);

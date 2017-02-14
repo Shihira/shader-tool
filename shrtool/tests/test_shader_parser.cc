@@ -106,9 +106,9 @@ TEST_CASE(test_parse_blinn_phong_sample) {
     assert_equal_print(si.name, "blinn-phong");
     assert_equal_print(si.attributes.value[0].first, layout::COL4);
     assert_equal_print(si.attributes.value[2].second, "uv");
-    assert_equal_print(si.property_groups[2].first, "material");
-    assert_equal_print(si.property_groups[1].second[0].second, "lightPosition");
-    assert_equal_print(si.property_groups[2].second[1].first, layout::COLOR);
+    assert_equal_print(si.property_groups[3].first, "material");
+    assert_equal_print(si.property_groups[2].second[0].second, "lightPosition");
+    assert_equal_print(si.property_groups[3].second[1].first, layout::COLOR);
     assert_equal_print(si.sub_shaders[0].type, shader::FRAGMENT);
     assert_equal_print(si.sub_shaders[1].type, shader::VERTEX);
 }

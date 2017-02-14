@@ -1,8 +1,7 @@
-#include "render_queue.h"
-#include "exception.h"
-
 #include <vector>
 #include <iostream>
+
+#include "render_queue.h"
 
 #define IF_FALSE_RET(x) if(!x) return;
 

@@ -113,17 +113,17 @@ using namespace shrtool::math;
 struct rotate_model_fixture : singlefunc_fixture {
     bool actions[4] = { false, false, false, false, };
 
-    bool update_helper(math::fmat4& model_mat) {
+    bool update_helper(transfrm& model_mat) {
         bool updated = false;
 
         if(actions[0] && (updated |= actions[0]))
-            model_mat = tf::rotate<float>(M_PI / 120, tf::zOx) * model_mat;
+            model_mat.rotate(M_PI / 120, tf::zOx);
         if(actions[1] && (updated |= actions[1]))
-            model_mat = tf::rotate<float>(-M_PI / 120, tf::zOx) * model_mat;
+            model_mat.rotate(-M_PI / 120, tf::zOx);
         if(actions[2] && (updated |= actions[2]))
-            model_mat = tf::rotate<float>(M_PI / 120, tf::yOz) * model_mat;
+            model_mat.rotate(M_PI / 120, tf::yOz);
         if(actions[3] && (updated |= actions[3]))
-            model_mat = tf::rotate<float>(-M_PI / 120, tf::yOz) * model_mat;
+            model_mat.rotate(-M_PI / 120, tf::yOz);
 
         return updated;
     }
@@ -144,8 +144,9 @@ struct rotate_model_fixture : singlefunc_fixture {
 };
 
 TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
-    render_target::screen.enable_depth_test(true);
+    camera cam;
+    cam.set_bgcolor(color(51, 51, 51));
+    cam.set_depth_test(true);
 
     ifstream shr_fs(locate_assets("shaders/blinn-phong.scm"));
     ifstream tp_fs(locate_assets("models/teapot.obj"));
@@ -158,11 +159,12 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
 
     size_t mesh_i = 0;
     vector<mesh_indexed*> meshes = { &ms, &tp[0], &chs[2] };
-    vector<fmat4> mesh_mats = {
-        tf::identity<float>(),
-        tf::scale<float>(1./30, 1./30, 1./30),
-        tf::scale<float>(1./60, 1./60, 1./60) *
-            tf::translate<float>(- find_average(chs[2]).cutdown<fcol3>()),
+    vector<transfrm> mesh_tf = {
+        transfrm(),
+        transfrm().scale(1./30, 1./30, 1./30),
+        transfrm()
+            .translate(- find_average(chs[2]).cutdown<col3>())
+            .scale(1./60, 1./60, 1./60),
     };
 
     universal_property<fcol4, fcol4, fcol4> mat_data(
@@ -173,34 +175,25 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
     universal_property<fcol4, fcol4, fcol4> ill_data(
             fcol4 { -2, 3, 4, 1 },
             fcol4 { 1, 1, 1, 1 },
-            fcol4 { 0, 1, 5, 1 }
+            fcol4 { 0, 2, 5, 1 }
         );
 
-    fmat4 view_mat = inverse(
-            tf::rotate<float>(M_PI / 8, tf::yOz) *
-            tf::translate<float>(item_get<2>(ill_data)));
-    fmat4 proj_mat = tf::perspective<float>(M_PI / 4, 4.0 / 3, 1, 100);
-
-    universal_property<fmat4, fmat4> mvp_data(
-            proj_mat * view_mat * mesh_mats[mesh_i],
-            mesh_mats[mesh_i]
-        );
+    cam.transformation()
+        .rotate(M_PI / 8, tf::yOz)
+        .translate(item_get<2>(ill_data));
 
     provided_render_task::provider_bindings bindings;
     provided_render_task t(bindings);
     t.set_shader(si);
-    t.set_target(render_target::screen);
+    t.set_target(cam);
     t.set_attributes(ms);
-    t.set_property("transfrm", mvp_data);
+    t.set_property("camera", cam);
+    t.set_property("transfrm", mesh_tf[mesh_i]);
     t.set_property("illum", ill_data);
     t.set_property("material", mat_data);
 
     update = [&]() {
-        fmat4& model_mat = mesh_mats[mesh_i];
-        if(!update_helper(model_mat)) return;
-
-        item_get<0>(!mvp_data) = proj_mat * view_mat * model_mat;
-        item_get<1>(!mvp_data) = model_mat;
+        update_helper(mesh_tf[mesh_i]);
     };
 
     keyrelease = [&](int key, int mod) {
@@ -214,14 +207,13 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
             mesh_i = (mesh_i + 1) % meshes.size();
             t.set_attributes(*meshes[mesh_i]);
 
-            item_get<0>(!mvp_data) = proj_mat * view_mat * mesh_mats[mesh_i];
-            item_get<1>(!mvp_data) = mesh_mats[mesh_i];
+            t.set_property("transfrm", mesh_tf[mesh_i]);
         }
     };
 
     draw = [&]() {
-        render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
-        render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
+        cam.clear_buffer(render_target::COLOR_BUFFER);
+        cam.clear_buffer(render_target::DEPTH_BUFFER);
 
         t.render();
     };
@@ -231,8 +223,9 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
 
 TEST_CASE_FIXTURE(test_cubemap, rotate_model_fixture)
 {
-    render_target::screen.initial_color(0.2, 0.2, 0.2, 1);
-    render_target::screen.enable_depth_test(true);
+    camera cam;
+    cam.set_bgcolor(color(51, 51, 51));
+    cam.set_depth_test(true);
 
     ifstream fshader(locate_assets("shaders/lambertian-cubemap.scm"));
     ifstream fcubemap(locate_assets("textures/skybox-texture.ppm"));
@@ -251,35 +244,29 @@ TEST_CASE_FIXTURE(test_cubemap, rotate_model_fixture)
     universal_property<fcol4, fcol4> ill_data(fcol4 { -5, 3, 5, 1 },
             fcol4 { 1, 1, 1, 1 }); // far~~
 
-    fmat4 model_mat = tf::identity<float>();
-    fmat4 view_mat = inverse(
-            //tf::rotate<float>(M_PI / 6, tf::zOx) *
-            //tf::rotate<float>(M_PI / 6, tf::yOz) *
-            tf::translate<float>(col4{0, 0, 5, 1}));
-    fmat4 proj_mat = tf::perspective<float>(M_PI / 4, 4.0 / 3, 1, 100);
+    transfrm model_tf;
+    cam.transformation().translate(0, 0, 5);
 
     size_t vmi = 0;
-    universal_property<fmat4, fmat4> mvp_data(
-            proj_mat * view_mat * model_mat,
-            model_mat
-        );
 
     provided_render_task::provider_bindings bindings;
     provided_render_task rtask(bindings);
     rtask.set_shader(shdr);
-    rtask.set_target(render_target::screen);
+    rtask.set_target(cam);
     rtask.set_attributes(box);
     rtask.set_property("illum", ill_data);
     rtask.set_property("material", mat_data);
-    rtask.set_property("transfrm", mvp_data);
+    rtask.set_property("transfrm", model_tf);
+    rtask.set_property("camera", cam);
     rtask.set_texture_property<texture_cubemap>("texMap", cubemap);
 
-    fmat4 view_mat_diff = tf::identity<float>();
+    transfrm diff_tf;
+    transfrm cam_tf = cam.transformation();
     update = [&]() {
-        if(!update_helper(view_mat_diff)) return;
-
-        item_get<0>(!mvp_data) = proj_mat * view_mat *
-            view_mat_diff * model_mat;
+        if(update_helper(diff_tf)) {
+            cam.transformation().set_mat(
+                diff_tf.get_inverse_mat() * cam_tf.get_mat());
+        }
     };
 
     keyrelease = [&](int key, int mod) {
@@ -297,8 +284,8 @@ TEST_CASE_FIXTURE(test_cubemap, rotate_model_fixture)
     };
 
     draw = [&]() {
-        render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
-        render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
+        cam.clear_buffer(render_target::COLOR_BUFFER);
+        cam.clear_buffer(render_target::DEPTH_BUFFER);
 
         rtask.render();
     };

@@ -3,117 +3,14 @@
 
 #include <iostream>
 
+#include "utilities.h"
+
 #include "traits.h"
 #include "reflection.h"
 #include "render_assets.h"
 #include "exception.h"
 
 namespace shrtool {
-
-struct color {
-    union {
-        struct {
-            uint8_t r;
-            uint8_t g;
-            uint8_t b;
-            uint8_t a;
-        } comp;
-        uint32_t rgba;
-        uint8_t bytes[4];
-    } data;
-
-    uint8_t& operator[](size_t i) {
-        return data.bytes[i];
-    }
-
-    color() { data.comp.a = 0xff; }
-
-    color(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 0xff) {
-        data.comp.r = r; data.comp.g = g;
-        data.comp.b = b; data.comp.a = a;
-    }
-
-    color(const std::string& s) {
-        size_t c;
-        std::stoi(s.c_str() + 1, &c, 16);
-        data.rgba = c;
-    }
-
-    explicit color(uint32_t rgba) {
-        data.rgba = rgba;
-    }
-
-    color& operator=(uint32_t rgba) {
-        data.rgba = rgba;
-        return *this;
-    }
-
-    color& operator=(const color& c) {
-        return operator=(c.data.rgba);
-    }
-
-    bool operator==(const color& c) const {
-        return data.rgba == c.data.rgba;
-    }
-
-    operator std::string() const;
-
-    size_t rgba() const { return data.rgba; }
-
-    int r() const { return data.bytes[0]; }
-    int g() const { return data.bytes[1]; }
-    int b() const { return data.bytes[2]; }
-    int a() const { return data.bytes[3]; }
-
-    typedef uint8_t* iterator;
-    typedef uint8_t const* const_iterator;
-
-    iterator begin() { return data.bytes; }
-    iterator end() { return data.bytes + 4; }
-    const_iterator begin() const { return data.bytes; }
-    const_iterator end() const { return data.bytes + 4; }
-    const_iterator cbegin() { return data.bytes; }
-    const_iterator cend() { return data.bytes + 4; }
-
-    static color from_string(const std::string s) {
-        return color(std::strtoul(s.c_str() + 1, nullptr, 16));
-    }
-
-    static color from_value(uint32_t rgba) {
-        return color(rgba);
-    }
-
-    static color from_rgba(int r, int g, int b, int a) {
-        return color(clamp_uchar(r), clamp_uchar(g),
-                clamp_uchar(b), clamp_uchar(a));
-    }
-
-    static void meta_reg_() {
-        refl::meta_manager::reg_class<color>("color")
-            .enable_clone()
-            .enable_equal()
-            .enable_print()
-            .function("from_string", from_string)
-            .function("from_value", from_value)
-            .function("from_rgba", from_rgba)
-            .function("r", &color::r)
-            .function("g", &color::g)
-            .function("b", &color::b)
-            .function("a", &color::a)
-            .function("rgba", &color::rgba);
-
-        refl::meta_manager::enable_cast<size_t, color>();
-    }
-
-private:
-    static uint8_t clamp_uchar(int v) {
-        return v < 0 ? 0 : v > 255 ? 255 : v;
-    }
-};
-
-static_assert(sizeof(color) == 4, "Bad: sizeof(color) != 4");
-
-std::ostream& operator<<(std::ostream& os, const color& c);
 
 class image {
     friend struct image_geometry_helper__;

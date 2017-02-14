@@ -568,6 +568,11 @@ public:
     }
 };
 
+template<typename T>
+struct is_matrix : std::false_type { };
+template<typename T, size_t M, size_t N>
+struct is_matrix<matrix<T, M, N>> : std::true_type { };
+
 template<typename T, size_t M, size_t N>
 std::ostream& operator<<(std::ostream& s, const matrix<T, M, N>& mat) {
     for(size_t m = 0; m < M; m++) {
@@ -650,6 +655,16 @@ typedef row<float, 4> frow4;
 typedef row<float, 3> frow3;
 typedef row<float, 2> frow2;
 typedef row<float, 1> frow1;
+
+typedef col<int32_t, 4> icol4;
+typedef col<int32_t, 3> icol3;
+typedef col<int32_t, 2> icol2;
+typedef col<int32_t, 1> icol1;
+
+typedef row<int32_t, 4> irow4;
+typedef row<int32_t, 3> irow3;
+typedef row<int32_t, 2> irow2;
+typedef row<int32_t, 1> irow1;
 
 template<typename T, size_t M, size_t N>
 typename std::enable_if<M == 1 || N == 1, double>::type
@@ -802,6 +817,11 @@ struct dynmatrix {
         std::swap(d.data_, data_);
         std::swap(d.is_agent_, is_agent_);
     }
+    template<size_t M, size_t N>
+    dynmatrix(const matrix<T, M, N>& m) {
+        assign(M, N);
+        std::copy(m.begin(), m.end(), data_);
+    }
 
     void assign(size_t rows, size_t cols) {
         if(data_) delete[] data_;
@@ -838,6 +858,13 @@ struct dynmatrix {
     template<size_t M, size_t N>
     static dynmatrix agent(matrix<value_type, M, N>& m) {
         return agent(m.rows, m.cols, m.data());
+    }
+
+    template<size_t M, size_t N>
+    operator matrix<value_type, M, N>() const {
+        matrix<value_type, M, N> m;
+        std::copy(data_, data_ + elem_count(), m.begin());
+        return std::move(m);
     }
 
     size_t rows() const { return rows_; }

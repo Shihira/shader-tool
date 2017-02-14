@@ -9,6 +9,8 @@
 #include "render_assets.h"
 #include "exception.h"
 #include "reflection.h"
+#include "utilities.h"
+#include "traits.h"
 
 namespace shrtool {
 
@@ -28,19 +30,15 @@ namespace shrtool {
  *     add_input - updated
  */
 
+/*
+ * render_target is not only a frame buffer, it saves all states that is need
+ * to be set before a pass of render, like viewport and clear color, which are
+ * mostly global states in OpenGL. And yes, those operations will mostly be done
+ * in shader::draw.
+ */
+
 class render_target : public lazy_id_object_<render_target> {
-protected:
-    bool screen_ = false;
-    float init_color_[4] = { 0, 0, 0, 1 };
-    size_t viewport_[4] = { 0, 0, 0, 0 };
-    float init_depth_ = 1;
-    bool enabled_depth_test_ = false;
-
-    render_target(bool scr) : screen_(scr) { }
-
 public:
-    render_target() : screen_(false) { }
-
     enum buffer_attachment {
         COLOR_BUFFER,
         COLOR_BUFFER_0,
@@ -51,43 +49,64 @@ public:
         DEPTH_BUFFER,
     };
 
-    // function render_Texture may alter viewport
-    void render_texture(buffer_attachment ba, render_assets::texture& tex);
-    void set_viewport(size_t x, size_t y, size_t w, size_t h);
-    void clear_buffer(buffer_attachment ba);
-    void initial_depth(float d) { init_depth_ = d; }
-    void initial_color(float r, float g, float b, float a) {
-        init_color_[0] = r; init_color_[1] = g;
-        init_color_[2] = b; init_color_[3] = a;
+protected:
+    std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
+
+public:
+    PROPERTY_RW(color, bgcolor)
+    PROPERTY_RW(float, infdepth)
+    PROPERTY_R_DW(rect, viewport, PROP_ASSERT(this != &screen,
+                "Viewport is unchangable for default screen"), {})
+    PROPERTY_RW(bool, depth_test)
+
+    render_target() : infdepth_(1), depth_test_(false) { }
+
+    void attach_texture(buffer_attachment ba, render_assets::texture& tex);
+    void force_set_viewport_(const rect& r) { viewport_ = r; }
+    virtual void apply_viewport() const;
+
+    render_assets::texture* get_attachment(buffer_attachment ba) {
+        auto i = tex_attachments_.find(ba);
+        if(i != tex_attachments_.end())
+            return i->second;
+        return nullptr;
     }
-    void enable_depth_test(bool e) { enabled_depth_test_ = e; }
-    bool is_depth_test_enabled() const { return enabled_depth_test_; }
+
+    void clear_buffer(buffer_attachment ba) const;
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
 
-    bool isscr() const { return screen_; }
-
-    static render_target& get_screen() {
+    static render_target& get_default_screen() {
         return screen;
     }
 
-    float target_ratio() const {
-        return float(viewport_[2]) / float(viewport_[3]);
+    double target_ratio() const {
+        return viewport_.width() / viewport_.height();
     }
 
-    static void meta_reg() {
+    bool is_screen() const {
+        return tex_attachments_.empty() && vacuum();
+    }
+
+    static void meta_reg_() {
         refl::meta_manager::reg_class<render_target>("render_target")
-            .function("screen", get_screen)
+            .function("screen", get_default_screen)
             .function("set_viewport", &render_target::set_viewport)
+            .function("get_viewport", &render_target::get_viewport)
             .function("clear_buffer", &render_target::clear_buffer)
-            .function("initial_depth", &render_target::initial_depth)
-            .function("initial_color", &render_target::initial_color)
-            .function("enable_depth_test", &render_target::enable_depth_test)
-            .function("is_screen", &render_target::isscr)
-            .function("bind_texture", &render_target::render_texture);
+            .function("set_infdepth", &render_target::set_infdepth)
+            .function("get_infdepth", &render_target::get_infdepth)
+            .function("set_bgcolor", &render_target::set_bgcolor)
+            .function("get_bgcolor", &render_target::get_bgcolor)
+            .function("set_depth_test", &render_target::set_depth_test)
+            .function("get_depth_test", &render_target::get_depth_test)
+            .function("is_screen", &render_target::is_screen)
+            .function("attach_texture", &render_target::attach_texture);
     }
 
+    // This is a global screen. Its viewport will always be maintained at the
+    // window size.
     static render_target screen;
 };
 
@@ -203,6 +222,113 @@ public:
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
+};
+
+struct camera : render_target {
+    transfrm& transformation() { return tf_; }
+    const transfrm& transformation() const { return tf_; }
+
+    PROPERTY_RW(bool, auto_viewport)
+    PROPERTY_R_DW(float, visible_angle, {}, PROP_MARKCHG(changed_))
+    PROPERTY_R_DW(float, near_clip_plane, {}, PROP_MARKCHG(changed_))
+    PROPERTY_R_DW(float, far_clip_plane, {}, PROP_MARKCHG(changed_))
+    PROPERTY_GENERIC_RW(float, aspect, {
+        if(!aspect_) return auto_viewport_ ?
+            render_target::screen.get_viewport().ratio() :
+            get_viewport().ratio(); },
+        {}, {}, PROP_MARKCHG(changed_))
+
+    camera() :
+        auto_viewport_(true),
+        visible_angle_(M_PI / 2),
+        near_clip_plane_(1),
+        far_clip_plane_(100),
+        aspect_(0)
+    { }
+
+    camera(camera&& c) :
+        render_target(std::move(c)),
+        auto_viewport_(c.auto_viewport_),
+        visible_angle_(c.visible_angle_),
+        near_clip_plane_(c.near_clip_plane_),
+        far_clip_plane_(c.far_clip_plane_),
+        aspect_(c.aspect_)
+    { }
+
+    bool is_changed() const { return changed_ || tf_.is_changed(); }
+    void mark_applied() { changed_ = false; tf_.mark_applied(); }
+
+    const math::mat4& get_view_mat() const {
+        return transformation().get_inverse_mat();
+    }
+
+    math::mat4 calc_projection_mat() const {
+        return math::tf::perspective(
+            get_visible_angle() / 2,
+            get_aspect(),
+            get_near_clip_plane(),
+            get_far_clip_plane());
+    }
+
+    math::mat4 calc_vp_mat() const {
+        return calc_projection_mat() *
+            transformation().get_inverse_mat();
+    }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<camera>("camera")
+            .enable_construct<>()
+            .enable_base<render_target>()
+            .function("transformation", static_cast<transfrm&(camera::*)()>(&camera::transformation))
+            .function("get_visible_angle", &camera::get_visible_angle)
+            .function("get_near_clip_plane", &camera::get_near_clip_plane)
+            .function("get_far_clip_plane", &camera::get_far_clip_plane)
+            .function("get_aspect", &camera::get_aspect)
+            .function("set_visible_angle", &camera::set_visible_angle)
+            .function("set_near_clip_plane", &camera::set_near_clip_plane)
+            .function("set_far_clip_plane", &camera::set_far_clip_plane)
+            .function("set_aspect", &camera::set_aspect)
+            .function("get_view_mat", &camera::get_view_mat)
+            .function("calc_projection_mat", &camera::calc_projection_mat)
+            .function("calc_vp_mat", &camera::calc_vp_mat);
+    }
+
+    void apply_viewport() const override;
+
+protected:
+    transfrm tf_;
+    bool changed_ = true;
+};
+
+template<>
+struct prop_trait<camera> {
+    typedef camera input_type;
+    typedef float value_type;
+    typedef shrtool::indirect_tag transfer_tag;
+
+    static size_t size(const input_type& i) {
+        return sizeof(float) * 32;
+    }
+
+    static bool is_changed(const input_type& i) {
+        return i.is_changed();
+    }
+
+    static void mark_applied(input_type& i) {
+        i.mark_applied();
+    }
+
+    static void copy(const input_type& i, value_type* o) {
+        value_type* o_1 = o + 16;
+        const math::mat4& v = i.get_view_mat(),
+              vp = i.calc_vp_mat();
+
+        for(size_t c = 0; c < 4; c++)
+            for(size_t r = 0; r < 4; r++) {
+                *(o++) = v.at(r, c);
+                *(o_1++) = vp.at(r, c);
+            }
+    }
 };
 
 }

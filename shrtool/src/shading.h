@@ -255,6 +255,8 @@ struct camera : render_target {
         aspect_(c.aspect_)
     { }
 
+    camera(const camera& c) = delete;
+
     bool is_changed() const { return changed_ || tf_.is_changed(); }
     void mark_applied() { changed_ = false; tf_.mark_applied(); }
 

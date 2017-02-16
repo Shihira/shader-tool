@@ -115,15 +115,12 @@ TEST_CASE_FIXTURE(test_scm_big_news, union_fixture) {
     scm_c_eval_string("(load big-news-path)");
     SCM main_rtask = scm_c_eval_string("main-rtask");
 
-    if(scm_is_null(main_rtask)) return;
+    assert_false(scm_is_null(main_rtask))
 
-    provided_render_task& r = scm::extract_instance(main_rtask)
-        ->get<provided_render_task>();
+    queue_render_task& r = scm::extract_instance(main_rtask)
+        ->get<queue_render_task>();
 
     draw = [&]() {
-        r.get_target()->clear_buffer(render_target::COLOR_BUFFER);
-        r.get_target()->clear_buffer(render_target::DEPTH_BUFFER);
-
         r.render();
     };
 

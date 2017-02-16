@@ -47,6 +47,27 @@ public:
 
 typedef render_task void_render_task;
 
+class proc_render_task : public render_task {
+    std::function<void()> func_;
+
+public:
+    proc_render_task() { }
+    proc_render_task(std::function<void()> f) : func_(f) { }
+
+    void set_proc(std::function<void()> f) { func_ = f; }
+    void render() const override {
+        if(func_) func_();
+    }
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<proc_render_task>("proc_rtask")
+            .enable_construct<>()
+            .enable_construct<std::function<void()>>()
+            .enable_base<render_task>()
+            .function("set_proc", &proc_render_task::set_proc);
+    }
+};
+
 /*
  * It is not that sorting is forced before rendering, because it is quite costly.
  * When you chose not to sort, you are supposed to have the ability to
@@ -80,8 +101,8 @@ public:
     const_iterator cbegin() const { return tasks.cbegin(); }
     const_iterator cend() const { return tasks.cend(); }
 
-    void push(const render_task& t) { tasks.push_back(&t); }
-    void pop(const render_task& t) { tasks.remove(&t); }
+    void append(const render_task& t) { tasks.push_back(&t); }
+    void remove(const render_task& t) { tasks.remove(&t); }
     size_t size() const { return tasks.size(); }
     void clear() { tasks.clear(); }
 
@@ -90,10 +111,10 @@ public:
             .enable_construct<>()
             .enable_base<render_task>()
             .function("sort", &queue_render_task::sort)
-            .function("push", &queue_render_task::push)
+            .function("append", &queue_render_task::append)
             .function("size", &queue_render_task::size)
             .function("clear", &queue_render_task::clear)
-            .function("pop", &queue_render_task::pop);
+            .function("remove", &queue_render_task::remove);
     }
 };
 

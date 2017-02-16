@@ -9,6 +9,7 @@
 #include "properties.h"
 #include "render_assets.h"
 #include "render_queue.h"
+#include "logger.h"
 
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
 // bith = built-in type hint
@@ -43,11 +44,23 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
         { "xOy", math::tf::xOy },
         { "yOz", math::tf::yOz },
         { "zOx", math::tf::zOx },
+
+        { "color-buffer", render_target::COLOR_BUFFER },
+        { "color-buffer-0", render_target::COLOR_BUFFER_0 },
+        { "color-buffer-1", render_target::COLOR_BUFFER_2 },
+        { "depth-buffer", render_target::DEPTH_BUFFER },
     }))
 
 ////////////////////////////////////////////////////////////////////////////////
 
 provided_render_task::provider_bindings bindings;
+
+void scm_t::operator()() {
+    if(scm_is_true(scm_procedure_p(scm))) {
+        scm_call_0(scm);
+    }
+    else throw restriction_error("not a procedure");
+}
 
 bool is_symbol_eq(SCM sym, const std::string& s)
 {
@@ -109,7 +122,8 @@ struct builtin {
             .function("make_shading_rtask", make_shading_rtask)
             .function("instance_has_function", &instance_has_function)
             .function("instance_get_type", &instance_get_type)
-            .function("meshes_from_wavefront", meshes_from_wavefront);
+            .function("meshes_from_wavefront", meshes_from_wavefront)
+            .function("set_log_level", logger_manager::set_current_level);
     }
 };
 
@@ -231,7 +245,9 @@ instance* extract_instance(SCM s)
 
 SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
 {
+#if 0
     try {
+#endif
         std::list<instance> args; // must use list
         std::vector<instance*> args_ptr;
 
@@ -251,6 +267,7 @@ SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
         instance ins = m.apply(scm_to_latin1_string(funcnm),
                 args_ptr.data(), args_ptr.size());
         return instance_to_scm(std::move(ins));
+#if 0
     } catch(const error_base& e) {
         return scm_throw(scm_from_latin1_symbol("cpp-error"),
                 SCM_LIST2(scm_from_latin1_string(e.error_name()),
@@ -259,6 +276,7 @@ SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
         return scm_throw(scm_from_latin1_symbol("cpp-error"),
                     scm_from_latin1_string(e.what()));
     }
+#endif
 }
 
 void register_all()
@@ -271,7 +289,8 @@ void register_all()
         std::string type_name = m.second.name();
 
         for(auto& f : m.second.function_set()) {
-            std::cout << type_name << "::" << f.first << std::endl;
+            debug_log << "scm registered " << type_name
+                << "::" << f.first << std::endl;
 
             if(f.first.empty())
                 continue;
@@ -322,6 +341,7 @@ void init_scm()
     render_task::meta_reg_();
     queue_render_task::meta_reg_();
     provided_render_task::meta_reg_();
+    proc_render_task::meta_reg_();
     render_target::meta_reg_();
     render_assets::texture2d::meta_reg_();
     camera::meta_reg_();

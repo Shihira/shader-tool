@@ -246,6 +246,17 @@ public:
 namespace shrtool {
 
 struct dynamic_property {
+    dynamic_property() { }
+    dynamic_property(size_t n) {
+        resize(n);
+    }
+    dynamic_property(dynamic_property&& dp) :
+            storage(std::move(dp.storage)),
+            offsets_(std::move(dp.offsets_)) {
+        std::swap(is_changed_, dp.is_changed_);
+        std::swap(offset_changed_, dp.offset_changed_);
+    }
+
     std::vector<refl::instance>& underlying() {
         return storage;
     }
@@ -354,9 +365,6 @@ struct dynamic_property {
     bool is_changed() const { return is_changed_; }
     void mark_applied() { is_changed_ = false; }
 
-    dynamic_property() {
-    }
-
     dynamic_property& operator!() {
         is_changed_ = true;
         return *this;
@@ -364,6 +372,8 @@ struct dynamic_property {
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<dynamic_property>("propset")
+            .enable_construct<>()
+            .enable_construct<size_t>()
             .function("get", &dynamic_property::get_instance)
             .function("set", &dynamic_property::set_instance)
             .function("set_float", &dynamic_property::set<float>)

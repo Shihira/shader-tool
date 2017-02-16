@@ -104,6 +104,7 @@ struct color {
     static void meta_reg_() {
         refl::meta_manager::reg_class<color>("color")
             .enable_construct<size_t>()
+            .enable_serialize()
             .enable_clone()
             .enable_equal()
             .enable_print()

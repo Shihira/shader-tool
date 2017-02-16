@@ -15,8 +15,11 @@ struct scm_t {
     scm_t(const scm_t& s) : scm_t(s.scm) { }
     ~scm_t() { scm_gc_unprotect_object(scm); }
 
+    void operator()();
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<scm_t>("scm")
+            .enable_callable()
             .enable_clone();
     }
 

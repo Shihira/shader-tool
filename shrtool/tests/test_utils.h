@@ -148,15 +148,18 @@ inline std::string locate_assets(const std::string& fn)
     std::string cp_2 = pcp_2 ? pcp_2 : "";
 
     std::string path_1 = cp_1 +
-        (cp_1.back() == '/' || cp_1.back() == '\\' ? "" : "/") + fn;
+        (cp_1.back() == '/' || cp_1.back() == '\\' || cp_1.empty() ? "" : "/") + fn;
     std::string path_2 = cp_2 +
-        (cp_1.back() == '/' || cp_1.back() == '\\' ? "" : "/") + fn;
+        (cp_2.back() == '/' || cp_2.back() == '\\' || cp_2.empty() ? "" : "/") + fn;
 
     std::ifstream if_1(path_1);
-    std::cout << "[C] " << path_1 << std::endl;
+    debug_log << "checking path " << path_1 << " ..."
+        << (if_1.good() ? " good" : "bad") << std::endl;
     if(if_1.good()) return path_1;
-    std::cout << "[C] " << path_2 << std::endl;
+
     std::ifstream if_2(path_2);
+    debug_log << "checking path " << path_2 << " ..."
+        << (if_2.good() ? " good" : "bad") << std::endl;
     if(if_2.good()) return path_2;
 
     throw std::runtime_error("Cannot read file: " + fn);

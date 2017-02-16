@@ -13,6 +13,7 @@
 #include "exception.h"
 #include "traits.h"
 #include "matrix.h"
+#include "logger.h"
 
 namespace shrtool {
 
@@ -118,6 +119,13 @@ struct typed_meta : meta {
     template<bool Enable = true>
     typed_meta& enable_print() {
         function("__print", &print_<Enable>);
+        return *this;
+    }
+
+    template<bool Enable = true>
+    typed_meta& enable_callable() {
+        // callable requires clonable
+        function("__call", &T::operator());
         return *this;
     }
 
@@ -267,6 +275,7 @@ struct meta_manager : generic_singleton<meta_manager> {
         enable_cast<int, double>();
         enable_cast<float, double>();
         enable_cast<double, float>();
+        enable_cast<double, int>();
     }
 
     template<typename T1, typename T2>
@@ -397,7 +406,8 @@ struct instance {
         }
 
         throw type_matching_error("Type not matched: " + m->name() +
-                (ptrm ? ":" + ptrm->name() : ""));
+                (ptrm ? ":" + ptrm->name() : "") + ", expected " +
+                typeid(T).name());
     }
 
     instance cast_to(const meta& rm) const {
@@ -591,6 +601,23 @@ struct arg_type_<instance*> {
     instance* convert(instance& ins) { return &ins; }
 };
 
+template<>
+struct arg_type_<std::function<void()>> {
+    struct callable {
+        instance ins;
+        callable(const callable& c) : ins(c.ins.clone()) { }
+        callable(instance&& i) : ins(std::move(i)) { }
+        void operator()() { ins.call("__call"); }
+    };
+
+    std::function<void()> convert(instance& ins) {
+        if(ins.get_meta().has_function("__call"))
+            return callable(ins.clone());
+
+        throw not_found_error("Not a callable instance");
+    }
+};
+
 template<typename RetType>
 inline RetType func_caller(instance*[], size_t n, std::function<RetType()> f)
 {
@@ -675,9 +702,9 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...) const)
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<RetType>::convert(
-            func_caller(args + 1, n - 1, std::function<RetType(Args...)>(
-                [&args, f](Args ... a) -> RetType {
-                    return (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+            func_caller(args, n, std::function<RetType(T&, Args...)>(
+                [&args, f](T& t, Args ... a) -> RetType {
+                    return (t.*f)(std::forward<Args>(a) ...);
                 })));
     };
 
@@ -688,9 +715,9 @@ template<typename T, typename ... Args>
 meta& meta::function(std::string name, void (T::*f) (Args...) const)
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
-        func_caller(args + 1, n - 1, std::function<void(Args...)>(
-            [&args, f](Args ... a) {
-                (args[0]->get<T>().*f)(std::forward<Args>(a) ...);
+        func_caller(args, n, std::function<void(T&, Args...)>(
+            [&args, f](T& t, Args ... a) {
+                (t.*f)(std::forward<Args>(a) ...);
             }));
         return instance();
     };
@@ -698,22 +725,19 @@ meta& meta::function(std::string name, void (T::*f) (Args...) const)
     return *this;
 }
 
-#define LOG_REFL_CALLING
-
 inline instance meta::apply(const std::string& name, instance* i[], size_t n) const
 {
-#ifdef LOG_REFL_CALLING
-    std::cout << "Calling " << this->name()
+    auto& dl_1 = debug_log;
+    dl_1 << "calling " << this->name()
         << "::" << name << '(' << std::flush;
     for(size_t e = 0; e < n; e++) {
-        std::cout << i[e]->get_meta().name();
+        dl_1 << i[e]->get_meta().name();
         if(i[e]->is_pointer())
-            std::cout << ":" << (i[e]->get_pointer_meta() ?
+            dl_1 << ":" << (i[e]->get_pointer_meta() ?
                 i[e]->get_pointer_meta()->name() : "void");
-        std::cout << (e == n - 1 ? "" : ", ") << std::flush;
+        dl_1 << (e == n - 1 ? "" : ", ") << std::flush;
     }
-    std::cout << ")" << std::endl;
-#endif
+    dl_1 << ")" << std::endl;
 
     auto fi = functions.find(name);
     if(fi == functions.end())
@@ -721,19 +745,18 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
     fun_type f = fi->second;
     instance ins = f(i, n);
 
-#ifdef LOG_REFL_CALLING
-    std::cout << "Exiting " << this->name()
+    auto& dl_2 = debug_log;
+    dl_2 << "exiting " << this->name()
         << "::" << name << " -> " << std::flush;
     if(ins.is_null())
-        std::cout << "void" << std::endl;
+        dl_2 << "void" << std::endl;
     else {
-        std::cout << ins.get_meta().name();
+        dl_2 << ins.get_meta().name();
         if(ins.is_pointer())
-            std::cout << ":" << (ins.get_pointer_meta() ?
+            dl_2 << ":" << (ins.get_pointer_meta() ?
                 ins.get_pointer_meta()->name() : "void");
-        std::cout << std::endl;
+        dl_2 << std::endl;
     }
-#endif
 
     return std::move(ins);
 }

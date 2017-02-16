@@ -2,12 +2,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define list-length
-  (lambda (l)
-    (cond
-      ((null? l) 0)
-      (#t (+ 1 (list-length (cdr l)))))))
-
 (define-public shrtool-register-function
   (lambda (func typenm funcnm)
     (eval
@@ -23,13 +17,14 @@
          (lambda args
            (general-subroutine ,typenm
              (string-append "__init_"
-               (number->string (list-length args))) args)))
+               (number->string (length args))) args)))
       (interaction-environment))))
 
 (load-extension "libshrtool" "shrtool_init_scm")
 
 (load "shader-def.scm")
 (load "matrix.scm")
+(load "zenity-extension.scm")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -65,6 +60,40 @@
         file-name-separator-string
         name
         ".ppm"))))
+
+(define symbol-concat
+  (lambda (a . b)
+    (letrec ((f (lambda (s tail)
+                  (if (null? tail) s
+                    (f (string-append s
+                         (symbol->string (car tail))) (cdr tail))))))
+      (string->symbol (f (symbol->string a) b)))))
+
+(define-syntax apply-member-func
+  (lambda (x)
+    (syntax-case x ()
+      ((_ type inst (func param ...))
+       (with-syntax
+         ((memfunc (datum->syntax x
+                     (symbol-concat
+                       (syntax->datum #'type) '-
+                       (syntax->datum #'func)))))
+         #'(memfunc inst param ...))))))
+(export apply-member-func)
+
+(define-syntax make-instance
+  (lambda (x)
+    (syntax-case x ()
+      ((_ type ctor-param prop ...)
+       (with-syntax
+         ((ctor (datum->syntax x
+                  (symbol-concat 'make- (syntax->datum #'type)))))
+         #'(let ((inst (apply ctor ctor-param)))
+             (apply-member-func type inst prop) ...
+             inst))))))
+(export make-instance)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define eval-counter 1)
 

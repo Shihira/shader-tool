@@ -114,6 +114,8 @@ std::map<GLFWwindow*, display_window*> display_window::map_;
 
 display_window dw;
 std::string full_input;
+std::string pre_full_input;
+
 render_task* main_rtask = nullptr;
 
 void has_input(char* line)
@@ -124,7 +126,8 @@ void has_input(char* line)
 
     SCM val = scm_call_1(
             scm_c_public_ref("shrtool", "shrtool-repl-body"),
-            scm_from_latin1_string(full_input.data()));
+            scm_from_latin1_string(full_input.empty() ?
+                pre_full_input.data(): full_input.data()));
 
     if(scm_is_false(scm_car(val)) &&
             scm::is_symbol_eq(scm_cadr(val), "read-error")) {
@@ -138,8 +141,13 @@ void has_input(char* line)
 
         for(char& c : full_input)
             c = c == '\n' ? ' ' : c;
-        add_history(full_input.c_str());
-        next_history();
+
+        if(!full_input.empty()) {
+            add_history(full_input.c_str());
+            next_history();
+            pre_full_input = std::move(full_input);
+        }
+
         full_input.clear();
     }
 }
@@ -151,8 +159,6 @@ int main(int argc, char* argv[])
     //scm::init_scm();
     scm_c_eval_string("(import (shrtool))");
     scm_c_eval_string("(define main-rtask #nil)");
-
-    render_target::screen.set_bgcolor(color(51, 51, 51));
 
     if(argc > 1)
         scm_c_primitive_load(argv[1]);
@@ -184,11 +190,10 @@ int main(int argc, char* argv[])
     };
 
     dw.draw = [&]() {
-        render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
-        render_target::screen.clear_buffer(render_target::DEPTH_BUFFER);
-
         if(main_rtask)
             main_rtask->render();
+        else
+            render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
     };
 
     dw.main_loop();

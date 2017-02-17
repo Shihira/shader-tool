@@ -39,6 +39,7 @@ public:
     static void meta_reg_() {
         refl::meta_manager::reg_class<render_task>("rtask")
             .enable_construct<>()
+            .enable_auto_register()
             .function("rely_on", &render_task::rely_on)
             .function("reclaim", &render_task::reclaim_reliance)
             .function("is_successor", &render_task::is_successor);
@@ -62,6 +63,7 @@ public:
     static void meta_reg_() {
         refl::meta_manager::reg_class<proc_render_task>("proc_rtask")
             .enable_construct<>()
+            .enable_auto_register()
             .enable_construct<std::function<void()>>()
             .enable_base<render_task>()
             .function("set_proc", &proc_render_task::set_proc);
@@ -110,6 +112,7 @@ public:
         refl::meta_manager::reg_class<queue_render_task>("queue_rtask")
             .enable_construct<>()
             .enable_base<render_task>()
+            .enable_auto_register()
             .function("sort", &queue_render_task::sort)
             .function("append", &queue_render_task::append)
             .function("size", &queue_render_task::size)
@@ -300,6 +303,7 @@ public:
     static void meta_reg_() {
         refl::meta_manager::reg_class<provided_render_task>("shading_rtask")
             .enable_base<render_task>()
+            .enable_auto_register()
             .function("set_shader", &provided_render_task::set_shader<shader_info>)
             .function("set_property", &provided_render_task::set_property<dynamic_property>)
             .function("set_property_camera", &provided_render_task::set_property<camera>)

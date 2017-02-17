@@ -28,6 +28,7 @@ public:
 
     static void meta_reg_() {
         meta_manager::reg_class<static_func_class>("static_func_class")
+            .enable_auto_register()
             .function("add", &static_func_class::add)
             .function("addf", &static_func_class::addf)
             .function("swap", &static_func_class::swap)
@@ -127,6 +128,7 @@ public:
     static void meta_reg_() {
         meta_manager::reg_class<member_func_class>("member_func_class")
             .enable_clone()
+            .enable_auto_register()
             .function("multiply", &member_func_class::multiply)
             .function("set_a", &member_func_class::set_a)
             .function("set_b", &member_func_class::set_b)
@@ -200,6 +202,16 @@ TEST_CASE(test_built_in_func)
     instance prn_2 = str_1.call("__print");
     assert_equal_print(prn_1.get<string>(), "6");
     assert_equal_print(prn_2.get<string>(), "Good job");
+}
+
+TEST_CASE(test_auto_register)
+{
+    typedef auto_register_func_guard_<> ar;
+    auto beg = ar::functions, end = ar::functions + ar::used;
+
+    assert_true(ar::used >= 2);
+    assert_true(find(beg, end, static_func_class::meta_reg_) != end);
+    assert_true(find(beg, end, member_func_class::meta_reg_) != end);
 }
 
 int main(int argc, char* argv[])

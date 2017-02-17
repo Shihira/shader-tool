@@ -73,12 +73,7 @@
   (lambda (x)
     (syntax-case x ()
       ((_ type inst (func param ...))
-       (with-syntax
-         ((memfunc (datum->syntax x
-                     (symbol-concat
-                       (syntax->datum #'type) '-
-                       (syntax->datum #'func)))))
-         #'(memfunc inst param ...))))))
+        #'($ inst : func param ...)))))
 (export apply-member-func)
 
 (define-syntax make-instance
@@ -92,6 +87,23 @@
              (apply-member-func type inst prop) ...
              inst))))))
 (export make-instance)
+
+(define-syntax $
+  (lambda (x)
+    (syntax-case x ()
+      (($ inst : func param ...)
+       (with-syntax
+         ((func-str (datum->syntax x
+                      (symbol->string (syntax->datum #'func)))))
+         #'((instance-search-function inst func-str) inst param ...))))))
+(export $)
+
+(define-syntax $-
+  (lambda (x)
+    (syntax-case x ()
+      (($- inst : func param ...)
+       #'(begin ($ inst : func param ...) #nil)))))
+(export $-)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

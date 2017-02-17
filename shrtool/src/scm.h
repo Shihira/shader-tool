@@ -19,6 +19,7 @@ struct scm_t {
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<scm_t>("scm")
+            .enable_auto_register()
             .enable_callable()
             .enable_clone();
     }

@@ -229,6 +229,7 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<mesh_indexed>("mesh")
+            .enable_auto_register()
             .function("has_positions", &mesh_indexed::has_positions)
             .function("has_normals", &mesh_indexed::has_normals)
             .function("has_uvs", &mesh_indexed::has_uvs)

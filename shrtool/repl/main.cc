@@ -164,6 +164,7 @@ int main(int argc, char* argv[])
         scm_c_primitive_load(argv[1]);
 
     rl_callback_handler_install(DEFAULT_PROMPT, has_input);
+    atexit(rl_callback_handler_remove);
 
     struct pollfd fd = { 0, POLLIN, 0 };
 

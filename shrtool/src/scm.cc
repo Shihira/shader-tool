@@ -101,11 +101,42 @@ struct builtin {
         return provided_render_task(bindings);
     }
 
-    static bool instance_has_function(instance& ins, const std::string& fn,
-            bool check_ptr) {
-        return !ins.is_pointer() ? ins.get_meta().has_function(fn) :
-            ins.get_pointer_meta() && check_ptr ?
-            ins.get_pointer_meta()->has_function(fn) : false;
+    static scm_t search_function(
+            std::string type,
+            const std::string& fn) {
+        for(char& c : type) c = c == '-' ? '_' : c;
+        const meta* m = meta_manager::find_meta(type);
+
+        while(m) {
+            std::string name = m->name();
+            for(char& c : name) c = c == '_' ? '-' : c;
+            name += "-" + fn;
+            debug_log << name << std::endl;
+
+            SCM sym = scm_from_latin1_symbol(name.c_str());
+            if(scm_is_true(scm_defined_p(sym, scm_interaction_environment())))
+                return sym;
+
+            m = m->get_base();
+        }
+
+        return SCM_ELISP_NIL;
+    }
+
+    static scm_t instance_search_function(instance& ins,
+            const std::string& fn) {
+        SCM ret;
+        if(ins.is_pointer()) {
+            if(!ins.get_pointer_meta()) return SCM_ELISP_NIL;
+            ret = search_function(ins.get_pointer_meta()->name(), fn).scm;
+        }
+
+        ret = search_function(ins.get_meta().name(), fn).scm;
+        if(!scm_is_symbol(ret)) return SCM_ELISP_NIL;
+
+        ret = scm_symbol_to_string(ret);
+        const char* name = scm_to_latin1_string(ret);
+        return scm_c_public_ref("shrtool", name);
     }
 
     static std::string instance_get_type(instance& ins, bool check_ptr) {
@@ -116,11 +147,13 @@ struct builtin {
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<builtin>("builtin")
+            .enable_auto_register()
             .function("shader_from_config", shader_from_config)
             .function("image_from_ppm", image_from_ppm)
             .function("make_propset", make_propset)
             .function("make_shading_rtask", make_shading_rtask)
-            .function("instance_has_function", &instance_has_function)
+            .function("search_function", &search_function)
+            .function("instance_search_function", &instance_search_function)
             .function("instance_get_type", &instance_get_type)
             .function("meshes_from_wavefront", meshes_from_wavefront)
             .function("set_log_level", logger_manager::set_current_level);
@@ -245,9 +278,7 @@ instance* extract_instance(SCM s)
 
 SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
 {
-#if 0
     try {
-#endif
         std::list<instance> args; // must use list
         std::vector<instance*> args_ptr;
 
@@ -267,7 +298,6 @@ SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
         instance ins = m.apply(scm_to_latin1_string(funcnm),
                 args_ptr.data(), args_ptr.size());
         return instance_to_scm(std::move(ins));
-#if 0
     } catch(const error_base& e) {
         return scm_throw(scm_from_latin1_symbol("cpp-error"),
                 SCM_LIST2(scm_from_latin1_string(e.error_name()),
@@ -276,7 +306,6 @@ SCM general_subroutine(SCM typenm, SCM funcnm, SCM scm_args)
         return scm_throw(scm_from_latin1_symbol("cpp-error"),
                     scm_from_latin1_string(e.what()));
     }
-#endif
 }
 
 void register_all()
@@ -330,13 +359,13 @@ void init_scm()
     scm_set_smob_print(instance_type, print_instance_scm);
     scm_set_smob_equalp(instance_type, equalp_instance_scm);
 
+    /*
     scm_t::meta_reg_();
     builtin::meta_reg_();
     color::meta_reg_();
     rect::meta_reg_();
     image::meta_reg_();
     mesh_indexed::meta_reg_();
-    shader_info::meta_reg_();
     dynamic_property::meta_reg_();
     render_task::meta_reg_();
     queue_render_task::meta_reg_();
@@ -346,6 +375,11 @@ void init_scm()
     render_assets::texture2d::meta_reg_();
     camera::meta_reg_();
     transfrm::meta_reg_();
+    */
+
+    typedef auto_register_func_guard_<> ar;
+    for(size_t i = 0; i < ar::used; i++)
+        ar::functions[i]();
 
     register_all();
 }

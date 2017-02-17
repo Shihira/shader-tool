@@ -11,17 +11,17 @@
   (built-in-shader "blinn-phong"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define propset-illum
-  (make-instance propset '()
-    (append (mat-cvec -2 3 4 1))
-    (append (mat-cvec  1 1 1 1))
-    (append (mat-cvec  0 1 5 1))))
-
 (define propset-material
   (make-instance propset '()
     (append (make-color #xff211919))
     (append (make-color #xffb2b2b2))
     (append (make-color #xff7f3333))))
+
+(define propset-illum
+  (make-instance propset '()
+    (append (mat-cvec -2 3 4 1))
+    (append (mat-cvec  1 1 1 1))
+    (append (mat-cvec  0 1 5 1))))
 
 (define transfrm-mesh
   (make-instance transfrm '()
@@ -30,10 +30,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define main-cam (make-camera))
+(define main-cam
+  (make-instance camera '()
+    (set-bgcolor (color-from-value #xff332222))
+    (set-depth-test #t)))
 (transfrm-translate (camera-transformation main-cam) 0 0 5)
-(render-target-set-bgcolor main-cam (color-from-value #xff000000))
-(render-target-set-depth-test main-cam #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define render-rtask
@@ -48,9 +49,9 @@
 
 (define clear-rtask
   (make-instance proc-rtask
-    `(,(lambda ()
-         (render-target-clear-buffer main-cam 'color-buffer)
-         (render-target-clear-buffer main-cam 'depth-buffer)))))
+    (list (lambda ()
+            ($ main-cam : clear-buffer 'color-buffer)
+            ($ main-cam : clear-buffer 'depth-buffer)))))
 
 (define main-rtask
   (make-instance queue-rtask '()

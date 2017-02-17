@@ -91,6 +91,7 @@ public:
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<render_target>("render_target")
+            .enable_auto_register()
             .function("screen", get_default_screen)
             .function("set_viewport", &render_target::set_viewport)
             .function("get_viewport", &render_target::get_viewport)
@@ -281,6 +282,7 @@ struct camera : render_target {
         refl::meta_manager::reg_class<camera>("camera")
             .enable_construct<>()
             .enable_base<render_target>()
+            .enable_auto_register()
             .function("transformation", static_cast<transfrm&(camera::*)()>(&camera::transformation))
             .function("get_visible_angle", &camera::get_visible_angle)
             .function("get_near_clip_plane", &camera::get_near_clip_plane)

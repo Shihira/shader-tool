@@ -374,6 +374,7 @@ struct dynamic_property {
         refl::meta_manager::reg_class<dynamic_property>("propset")
             .enable_construct<>()
             .enable_construct<size_t>()
+            .enable_auto_register()
             .function("get", &dynamic_property::get_instance)
             .function("set", &dynamic_property::set_instance)
             .function("set_float", &dynamic_property::set<float>)

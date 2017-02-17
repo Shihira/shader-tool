@@ -164,6 +164,7 @@ public:
     static void meta_reg_() {
         refl::meta_manager::reg_class<texture2d>("texture2d")
             .enable_construct<size_t, size_t>()
+            .enable_auto_register()
             .function("reserve", &texture2d::reserve)
             .function("width", static_cast<size_t(texture2d::*)()const>(&texture2d::width))
             .function("height", static_cast<size_t(texture2d::*)()const>(&texture2d::height));

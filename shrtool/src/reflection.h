@@ -26,14 +26,17 @@ struct instance;
 struct meta {
     friend struct meta_manager;
 
-private:
+protected:
     typedef std::function<instance(instance*[], size_t n)> fun_type;
 
     std::string name_;
     const std::type_info& type_info;
     std::map<std::string, fun_type> functions;
+    const meta* base_meta_ = nullptr;
 
 public:
+    const meta* get_base() const { return base_meta_; }
+
     meta(std::string n, const std::type_info& ti) :
         name_(std::move(n)), type_info(ti) { }
     meta(meta&& m) : name_(std::move(m.name_)), type_info(m.type_info),
@@ -92,6 +95,54 @@ public:
     }
 };
 
+// auto_register_func_guard_ is defined as a template class. this is actually
+// a trick to allow static varables to define in header and get rid of errors
+// like redefinition at the same time.
+//
+// we cannot use a vector here, because global variables (including static
+// variables) initialize in an undefined order. if vector initialize later, not
+// only the meta_reg_ records will be clear but it may cause segmentation fault
+
+template<size_t size = 64>
+struct auto_register_func_guard_ {
+    typedef void (*func_type) (void);
+    static constexpr size_t max_size = size;
+    static size_t used;
+    static func_type functions[size];
+};
+
+template<size_t size>
+size_t auto_register_func_guard_<size>::used = 0;
+
+template<size_t size>
+typename auto_register_func_guard_<size>::func_type
+auto_register_func_guard_<size>::functions[size];
+
+template<typename T>
+struct auto_register_ {
+    typedef auto_register_func_guard_<> ar;
+
+    auto_register_() {
+
+        if(ar::used >= ar::max_size) throw restriction_error(
+                "Meta registeration has reached its capacity");
+
+        ar::functions[ar::used] = T::meta_reg_;
+        ar::used += 1;
+    }
+
+    // this is a trick to insure inst to get correctly instantiate: empty
+    // functions will probably be optimized away, but virtual functions won't.
+    virtual void activate() { }
+    static void s_activate() { inst.activate(); }
+
+    static auto_register_ inst;
+};
+
+template<typename T>
+auto_register_<T> auto_register_<T>::inst { };
+
+
 template<typename T>
 struct typed_meta : meta {
     template<typename To>
@@ -142,6 +193,12 @@ struct typed_meta : meta {
     typed_meta& enable_construct() {
         function("__init_" + std::to_string(sizeof...(Args)),
                 init_<Args...>);
+        return *this;
+    }
+
+    template<bool Enable = true>
+    typed_meta& enable_auto_register() {
+        auto_register_<T>::s_activate();
         return *this;
     }
 
@@ -313,6 +370,7 @@ typed_meta<T>& typed_meta<T>::enable_base()
 {
     meta& to_m = meta_manager::get_meta<To>();
     std::string func_name = "__to_" + to_m.name();
+    base_meta_ = &to_m;
     function(func_name, &base_<To>);
     return *this;
 }

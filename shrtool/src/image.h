@@ -95,6 +95,7 @@ public:
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<image>("image")
+            .enable_auto_register()
             .enable_clone()
             .function("flip_h", &image::flip_h)
             .function("flip_v", &image::flip_v)

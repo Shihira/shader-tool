@@ -3,6 +3,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-model
 ; (mesh-gen-uv-sphere 2 20 10 #t))
+; (mesh-gen-plane 1 1 1 1))
  (mesh-gen-box 2 2 2))
 ; (vector-ref (built-in-model "teapot") 0))
 
@@ -32,9 +33,9 @@
 
 (define main-cam
   (make-instance camera '()
-    (set-bgcolor (color-from-value #xff332222))
+    (set-bgcolor (make-color #xff332222))
     (set-depth-test #t)))
-(transfrm-translate (camera-transformation main-cam) 0 0 5)
+($ ($ main-cam : transformation) : translate 0 1 5)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define render-rtask
@@ -48,13 +49,10 @@
     (set-target main-cam)))
 
 (define clear-rtask
-  (make-instance proc-rtask
-    (list (lambda ()
-            ($ main-cam : clear-buffer 'color-buffer)
-            ($ main-cam : clear-buffer 'depth-buffer)))))
+  (rtask-def-clear main-cam '(color-buffer depth-buffer)))
 
 (define main-rtask
   (make-instance queue-rtask '()
-    (append clear-rtask)
+    (append (car clear-rtask))
     (append render-rtask)))
 

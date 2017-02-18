@@ -57,9 +57,9 @@ private:
 
 #define LAZEOBJ_SCALAR_PROP(type, name, def) \
     protected: type name##_ = def; \
-    public: type name() const { return name##_; } \
+    public: type get_##name() const { return name##_; } \
     public: \
-    void name(type t) { \
+    void set_##name(type t) { \
         if(!vacuum() && name##_ != t) \
             throw restriction_error(#name " can no longer be changed"); \
         name##_ = t; \
@@ -149,12 +149,24 @@ public:
 
     virtual void bind_to(size_t tex_bind) const;
     virtual void attach_to(size_t tex_attachment);
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<texture>("texture")
+            .enable_auto_register()
+            .function("get_width", &texture::get_width)
+            .function("set_width", &texture::set_width)
+            .function("get_height", &texture::get_height)
+            .function("set_height", &texture::set_height)
+            .function("get_format", &texture::get_internal_format)
+            .function("set_format", &texture::set_internal_format)
+            .function("reserve", &texture::reserve);
+    }
 };
 
 class texture2d : public texture {
 public:
     texture2d(texture2d&& tex) :
-            texture2d(tex.width(), tex.height(), tex.internal_format()) {
+            texture2d(tex.width_, tex.height_, tex.internal_format_) {
         lazy_id_object_<texture>::operator=(std::move(tex));
     }
 
@@ -164,17 +176,16 @@ public:
     static void meta_reg_() {
         refl::meta_manager::reg_class<texture2d>("texture2d")
             .enable_construct<size_t, size_t>()
-            .enable_auto_register()
-            .function("reserve", &texture2d::reserve)
-            .function("width", static_cast<size_t(texture2d::*)()const>(&texture2d::width))
-            .function("height", static_cast<size_t(texture2d::*)()const>(&texture2d::height));
+            .enable_construct<size_t, size_t, format>()
+            .enable_base<texture>()
+            .enable_auto_register();
     }
 };
 
 class texture_cubemap : public texture {
 public:
     texture_cubemap(texture_cubemap&& tex) :
-            texture_cubemap(tex.width(), tex.internal_format()) {
+            texture_cubemap(tex.width_, tex.internal_format_) {
         lazy_id_object_<texture>::operator=(std::move(tex));
     }
 
@@ -186,7 +197,7 @@ public:
 
     texture_cubemap(size_t edge_len = 0, format ifmt = DEFAULT_FMT) :
             texture(edge_len, edge_len, 6, ifmt) {
-        trait(CUBEMAP);
+        set_trait(CUBEMAP);
     }
 
     virtual void fill(const void* data, format fmt = DEFAULT_FMT) override;

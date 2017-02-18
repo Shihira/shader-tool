@@ -28,7 +28,7 @@ public:
 
     static void fbsize_callback(GLFWwindow* window,
             int width, int height) {
-        render_target::screen.force_set_viewport_(rect::from_size(width, height));
+        render_target::screen.set_viewport(rect::from_size(width, height));
     }
 
     static void init(const std::string ver_str = "330 core",
@@ -61,7 +61,7 @@ public:
         glfwSetKeyCallback(inst().window, key_callback);
         glfwSetFramebufferSizeCallback(inst().window, fbsize_callback);
 
-        render_target::screen.force_set_viewport_(rect::from_size(w, h));
+        render_target::screen.set_viewport(rect::from_size(w, h));
     }
 
     static void geometry_source(size_t& w, size_t& h) {

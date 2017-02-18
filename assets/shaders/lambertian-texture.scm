@@ -2,8 +2,8 @@
     
 `((name . "lambertian-texture")
   ,shader-def-attr-mesh
-  ,shader-def-prop-transfrm
-  ,shader-def-prop-camera
+  ,(shader-def-prop-transfrm)
+  ,(shader-def-prop-camera)
   (property-group
     (name . "illum")
     (layout

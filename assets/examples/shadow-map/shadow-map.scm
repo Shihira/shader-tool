@@ -1,21 +1,13 @@
-(use-modules (shrtool))
+(import (shrtool))
 
-`((name . "solid-color")
+`((name . "shadow-map")
   ,shader-def-attr-mesh
   ,(shader-def-prop-transfrm)
   ,(shader-def-prop-camera)
-  (property-group
-    (name . "material")
-    (layout
-     (col4 . "color")))
   (sub-shader
     (type . fragment)
     (version . "330 core")
-    (source . "
-      out vec4 outColor;
-      void main() {
-          outColor = color;
-      }"))
+    (source . "void main() { }"))
   (sub-shader
     (type . vertex)
     (version . "330 core")

@@ -101,21 +101,16 @@ void render_target::attach_texture(
     glBindFramebuffer(GL_FRAMEBUFFER, id());
     tex.attach_to(em_buffer_attachment_(ba));
 
-    viewport_ = rect::from_size(tex.width(), tex.height());
+    set_viewport(rect::from_size(tex.get_width(), tex.get_height()));
 
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
 void render_target::apply_viewport() const
 {
-    const auto& vp = viewport_;
+    const auto& vp = get_viewport();
     glViewport(vp.tl[0], vp.tl[1],
             vp.width(), vp.height());
-}
-
-void camera::apply_viewport() const
-{
-    render_target::screen.apply_viewport();
 }
 
 void render_target::clear_buffer(render_target::buffer_attachment ba) const {
@@ -200,9 +195,10 @@ void shader::draw(const vertex_attr_vector& vat) const {
     glBindVertexArray(vat.id());
     glBindFramebuffer(GL_FRAMEBUFFER, target_->id());
 
-    if(target_->get_depth_test()) {
+    if(target_->get_depth_test())
         glEnable(GL_DEPTH_TEST);
-    }
+    else
+        glDisable(GL_DEPTH_TEST);
 
     target_->apply_viewport();
 

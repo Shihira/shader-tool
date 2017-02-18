@@ -570,6 +570,14 @@ struct ret_type_<math::matrix<T, M, N>&> {
     }
 };
 
+template<typename T, size_t M, size_t N>
+struct ret_type_<const math::matrix<T, M, N>&> {
+    static instance convert(const math::matrix<T, M, N>& ins) {
+        return instance::make<math::dynmatrix<T>>(
+            math::dynmatrix<T>::agent(M, N, const_cast<T*>(ins.data())));
+    }
+};
+
 template<typename T>
 struct arg_type_ {
     instance tmp;
@@ -708,8 +716,9 @@ inline RetType func_caller(instance* args[], size_t n,
 template<typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (*f) (Args...))
 {
+    typedef typename std::remove_cv<RetType>::type pure_ret_t;
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
-        return ret_type_<RetType>::convert(
+        return ret_type_<pure_ret_t>::convert(
                 func_caller(args, n, std::function<RetType(Args...)>(f)));
     };
 
@@ -730,8 +739,9 @@ meta& meta::function(std::string name, void (*f) (Args...))
 template<typename T, typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (T::*f) (Args...))
 {
+    typedef typename std::remove_cv<RetType>::type pure_ret_t;
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
-        return ret_type_<RetType>::convert(
+        return ret_type_<pure_ret_t>::convert(
             func_caller(args, n, std::function<RetType(T&, Args...)>(
                 [&args, f](T& t, Args ... a) -> RetType {
                     return (t.*f)(std::forward<Args>(a) ...);
@@ -758,8 +768,9 @@ meta& meta::function(std::string name, void (T::*f) (Args...))
 template<typename T, typename RetType, typename ... Args>
 meta& meta::function(std::string name, RetType (T::*f) (Args...) const)
 {
+    typedef typename std::remove_cv<RetType>::type pure_ret_t;
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
-        return ret_type_<RetType>::convert(
+        return ret_type_<pure_ret_t>::convert(
             func_caller(args, n, std::function<RetType(T&, Args...)>(
                 [&args, f](T& t, Args ... a) -> RetType {
                     return (t.*f)(std::forward<Args>(a) ...);

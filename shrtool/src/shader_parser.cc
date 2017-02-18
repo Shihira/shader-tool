@@ -67,16 +67,20 @@ std::string layout::make_source_as_prop(const std::string& n) const
     std::string src = "uniform " + n + " {\n";
     std::vector<const type_name_pair*> textures;
 
+    bool empty = true;
+
     for(auto& li : value) {
         if(li.first >= TEX2D) {
             textures.push_back(&li);
             continue;
         }
 
+        empty = false;
         src += "    " + layout::glsl_type_name(li.first) +
             " " + li.second + ";\n";
     }
     src += "};\n";
+    src = empty ? "" : src;
 
     for(auto* li : textures) {
         src += "uniform " + layout::glsl_type_name(li->first)

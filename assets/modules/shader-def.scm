@@ -6,16 +6,19 @@
       (col3 . "uv"))))
 
 (define-public shader-def-prop-camera
-  '(property-group
-    (name . "camera")
-    (layout
-      (mat4 . "vMatrix")
-      (mat4 . "vpMatrix"))))
+  (lambda* (#:key (name "camera") (prefix ""))
+    `(property-group
+      (name . ,name)
+      (layout
+        (mat4 . ,(string-append prefix "vMatrix"))
+        (mat4 . ,(string-append prefix "vMatrix_inv"))
+        (mat4 . ,(string-append prefix "vpMatrix"))))))
 
 (define-public shader-def-prop-transfrm
-  '(property-group
-    (name . "transfrm")
-    (layout
-      (mat4 . "mMatrix")
-      (mat4 . "mMatrix_inv"))))
+  (lambda* (#:key (name "transfrm") (prefix ""))
+    `(property-group
+      (name . ,name)
+      (layout
+        (mat4 . ,(string-append prefix "mMatrix"))
+        (mat4 . ,(string-append prefix "mMatrix_inv"))))))
 

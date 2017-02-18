@@ -207,8 +207,8 @@ struct provider<InputType, render_assets::texture2d> {
     template<typename Trait = texture2d_trait<input_type>>
     static void update(input_type& i, output_type& p, bool anew) {
         if(anew) {
-            p.width(Trait::width(i));
-            p.height(Trait::height(i));
+            p.set_width(Trait::width(i));
+            p.set_height(Trait::height(i));
             p.fill(Trait::data(i), Trait::format(i));
         }
     }
@@ -224,8 +224,8 @@ struct provider<InputType, render_assets::texture_cubemap> {
     template<typename Trait = texture2d_trait<input_type>>
     static void update(input_type& i, output_type& p, bool anew) {
         if(anew) {
-            p.width(Trait::width(i));
-            p.height(Trait::height(i) / 6);
+            p.set_width(Trait::width(i));
+            p.set_height(Trait::height(i) / 6);
             p.fill(Trait::data(i), Trait::format(i));
         }
     }

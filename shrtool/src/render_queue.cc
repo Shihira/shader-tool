@@ -3,7 +3,7 @@
 
 #include "render_queue.h"
 
-#define IF_FALSE_RET(x) if(!x) return;
+#define IF_FALSE_RET(x, msg) if(!x) { warning_log << msg << std::endl; return; }
 
 namespace shrtool {
 
@@ -52,31 +52,22 @@ void queue_render_task::sort() {
 void shader_render_task::set_property(const std::string& name,
         render_assets::property_buffer& p) {
     prop_[name] = &p;
-
-    prop_buf_ref_changed = true;
 }
 
 void shader_render_task::set_texture_property(const std::string& name,
         render_assets::texture& p) {
     prop_tex_[name] = &p;
-
-    prop_buf_ref_changed = true;
 }
 
 void shader_render_task::render() const {
-    IF_FALSE_RET(shr_)
-    IF_FALSE_RET(target_)
-    IF_FALSE_RET(attr_)
-    IF_FALSE_RET(prop_.size())
+    IF_FALSE_RET(shr_, "no shader is set")
+    IF_FALSE_RET(target_, "no target is set")
+    IF_FALSE_RET(attr_, "no attribute is set")
 
-    if(prop_buf_ref_changed) {
-        for(auto& e : prop_tex_)
-            shr_->property(e.first, *e.second);
-        for(auto& e : prop_)
-            shr_->property(e.first, *e.second);
-
-        prop_buf_ref_changed = false;
-    }
+    for(auto& e : prop_tex_)
+        shr_->property(e.first, *e.second);
+    for(auto& e : prop_)
+        shr_->property(e.first, *e.second);
 
     shr_->target(*target_);
 

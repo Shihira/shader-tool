@@ -298,6 +298,7 @@ struct rect {
         refl::meta_manager::reg_class<rect>("rect")
             .enable_construct<math::dxmat, math::dxmat>()
             .enable_construct<double, double, double, double>()
+            .enable_print()
             .enable_auto_register()
             .function("area", &rect::area)
             .function("width", &rect::width)
@@ -330,6 +331,13 @@ struct transfrm {
     transfrm(transfrm&& t) :
         mat_(std::move(t.mat_)),
         inv_mat_(std::move(t.inv_mat_)) { }
+
+    transfrm& operator=(const transfrm& t) {
+        mat_ = t.mat_;
+        inv_mat_ = t.inv_mat_;
+        changed_ = true;
+        return *this;
+    }
 
     transfrm& translate(double x, double y, double z) {
         translate(math::col4 { x, y, z, 1 });

@@ -37,7 +37,7 @@ class display_window {
 
     static void fbsize_callback(GLFWwindow* window,
             int width, int height) {
-        render_target::screen.force_set_viewport_(rect::from_size(width, height));
+        render_target::screen.set_viewport(rect::from_size(width, height));
     }
 
     static void do_nothing_v() { }
@@ -88,7 +88,7 @@ public:
         glfwSetFramebufferSizeCallback(window, fbsize_callback);
 
         map_[window] = this;
-        render_target::screen.force_set_viewport_(rect::from_size(w, h));
+        render_target::screen.set_viewport(rect::from_size(w, h));
     }
 
     void main_loop() {
@@ -180,10 +180,10 @@ int main(int argc, char* argv[])
         if(!scm_is_null(prob_mr)) {
             refl::instance* ins = scm::extract_instance(prob_mr);
 
-            if(ins->get_meta().is_same<queue_render_task>())
+            if(ins && ins->get_meta().is_same<queue_render_task>())
                 main_rtask = &scm::extract_instance(prob_mr)
                     ->get<queue_render_task>();
-            if(ins->get_meta().is_same<provided_render_task>())
+            else if(ins && ins->get_meta().is_same<provided_render_task>())
                 main_rtask = &scm::extract_instance(prob_mr)
                     ->get<provided_render_task>();
         } else

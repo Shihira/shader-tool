@@ -51,19 +51,21 @@ public:
 
 protected:
     std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
+    rect viewport_;
 
 public:
     PROPERTY_RW(color, bgcolor)
     PROPERTY_RW(float, infdepth)
-    PROPERTY_R_DW(rect, viewport, PROP_ASSERT(this != &screen,
-                "Viewport is unchangable for default screen"), {})
     PROPERTY_RW(bool, depth_test)
 
     render_target() : infdepth_(1), depth_test_(false) { }
 
     void attach_texture(buffer_attachment ba, render_assets::texture& tex);
-    void force_set_viewport_(const rect& r) { viewport_ = r; }
-    virtual void apply_viewport() const;
+
+    void apply_viewport() const;
+
+    virtual void set_viewport(const rect& r) { viewport_ = r; }
+    virtual const rect& get_viewport() const { return viewport_; }
 
     render_assets::texture* get_attachment(buffer_attachment ba) {
         auto i = tex_attachments_.find(ba);
@@ -228,6 +230,7 @@ public:
 struct camera : render_target {
     transfrm& transformation() { return tf_; }
     const transfrm& transformation() const { return tf_; }
+    void set_transformation(const transfrm& t) { tf_ = t; }
 
     PROPERTY_RW(bool, auto_viewport)
     PROPERTY_R_DW(float, visible_angle, {}, PROP_MARKCHG(changed_))
@@ -265,6 +268,10 @@ struct camera : render_target {
         return transformation().get_inverse_mat();
     }
 
+    const math::mat4& get_view_mat_inv() const {
+        return transformation().get_mat();
+    }
+
     math::mat4 calc_projection_mat() const {
         return math::tf::perspective(
             get_visible_angle() / 2,
@@ -284,20 +291,32 @@ struct camera : render_target {
             .enable_base<render_target>()
             .enable_auto_register()
             .function("transformation", static_cast<transfrm&(camera::*)()>(&camera::transformation))
+            .function("set_transformation", &camera::set_transformation)
             .function("get_visible_angle", &camera::get_visible_angle)
             .function("get_near_clip_plane", &camera::get_near_clip_plane)
             .function("get_far_clip_plane", &camera::get_far_clip_plane)
             .function("get_aspect", &camera::get_aspect)
+            .function("set_auto_viewport", &camera::set_auto_viewport)
             .function("set_visible_angle", &camera::set_visible_angle)
             .function("set_near_clip_plane", &camera::set_near_clip_plane)
             .function("set_far_clip_plane", &camera::set_far_clip_plane)
             .function("set_aspect", &camera::set_aspect)
             .function("get_view_mat", &camera::get_view_mat)
+            .function("get_view_mat_inv", &camera::get_view_mat_inv)
             .function("calc_projection_mat", &camera::calc_projection_mat)
             .function("calc_vp_mat", &camera::calc_vp_mat);
     }
 
-    void apply_viewport() const override;
+    void set_viewport(const rect& r) override {
+        set_auto_viewport(false);
+        viewport_ = r;
+    }
+
+    const rect& get_viewport() const override {
+        if(!auto_viewport_)
+            return viewport_;
+        return render_target::screen.get_viewport();
+    }
 
 protected:
     transfrm tf_;
@@ -311,7 +330,7 @@ struct prop_trait<camera> {
     typedef shrtool::indirect_tag transfer_tag;
 
     static size_t size(const input_type& i) {
-        return sizeof(float) * 32;
+        return sizeof(float) * 16 * 3;
     }
 
     static bool is_changed(const input_type& i) {
@@ -324,13 +343,17 @@ struct prop_trait<camera> {
 
     static void copy(const input_type& i, value_type* o) {
         value_type* o_1 = o + 16;
-        const math::mat4& v = i.get_view_mat(),
-              vp = i.calc_vp_mat();
+        value_type* o_2 = o + 32;
+        const math::mat4&
+            v = i.get_view_mat(),
+            vi = i.get_view_mat_inv(),
+            vp = i.calc_vp_mat();
 
         for(size_t c = 0; c < 4; c++)
             for(size_t r = 0; r < 4; r++) {
                 *(o++) = v.at(r, c);
-                *(o_1++) = vp.at(r, c);
+                *(o_1++) = vi.at(r, c);
+                *(o_2++) = vp.at(r, c);
             }
     }
 };

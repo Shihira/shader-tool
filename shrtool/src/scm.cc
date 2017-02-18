@@ -49,6 +49,11 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
         { "color-buffer-0", render_target::COLOR_BUFFER_0 },
         { "color-buffer-1", render_target::COLOR_BUFFER_2 },
         { "depth-buffer", render_target::DEPTH_BUFFER },
+
+        { "rgba-u8888", render_assets::texture::RGBA_U8888 },
+        { "r-f32", render_assets::texture::R_F32 },
+        { "depth-f32", render_assets::texture::DEPTH_F32 },
+        { "default-fmt", render_assets::texture::DEFAULT_FMT },
     }))
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +82,18 @@ struct builtin {
     static image image_from_ppm(const std::string& fn) {
         std::ifstream fin(fn);
         return image_io_netpbm::load(fin);
+    }
+
+    static void image_save_ppm(const image& im, const std::string& fn) {
+        std::ofstream fout(fn);
+        return image_io_netpbm::save_image(fout, im);
+    }
+
+    static image texture_to_image(render_assets::texture& tex,
+            render_assets::texture::format fmt) {
+        image img(tex.get_width(), tex.get_height() * tex.get_depth());
+        tex.read(img.data(), fmt);
+        return std::move(img);
     }
 
     static scm_t meshes_from_wavefront(const std::string& fn) {
@@ -111,7 +128,6 @@ struct builtin {
             std::string name = m->name();
             for(char& c : name) c = c == '_' ? '-' : c;
             name += "-" + fn;
-            debug_log << name << std::endl;
 
             SCM sym = scm_from_latin1_symbol(name.c_str());
             if(scm_is_true(scm_defined_p(sym, scm_interaction_environment())))
@@ -120,6 +136,9 @@ struct builtin {
             m = m->get_base();
         }
 
+        warning_log << "canoot find " << fn
+            << " for type " << type << std::endl;
+
         return SCM_ELISP_NIL;
     }
 
@@ -127,11 +146,11 @@ struct builtin {
             const std::string& fn) {
         SCM ret;
         if(ins.is_pointer()) {
-            if(!ins.get_pointer_meta()) return SCM_ELISP_NIL;
+            if(!ins.get_pointer_meta())
+                return SCM_ELISP_NIL;
             ret = search_function(ins.get_pointer_meta()->name(), fn).scm;
-        }
+        } else ret = search_function(ins.get_meta().name(), fn).scm;
 
-        ret = search_function(ins.get_meta().name(), fn).scm;
         if(!scm_is_symbol(ret)) return SCM_ELISP_NIL;
 
         ret = scm_symbol_to_string(ret);
@@ -150,6 +169,8 @@ struct builtin {
             .enable_auto_register()
             .function("shader_from_config", shader_from_config)
             .function("image_from_ppm", image_from_ppm)
+            .function("image_save_ppm", image_save_ppm)
+            .function("texture_to_image", texture_to_image)
             .function("make_propset", make_propset)
             .function("make_shading_rtask", make_shading_rtask)
             .function("search_function", &search_function)
@@ -273,6 +294,7 @@ instance scm_to_instance(SCM s)
 
 instance* extract_instance(SCM s)
 {
+    if(!SCM_SMOB_PREDICATE(instance_type, s)) return nullptr;
     return (instance*)SCM_SMOB_DATA(s);
 }
 
@@ -358,24 +380,6 @@ void init_scm()
     scm_set_smob_free(instance_type, free_instance_scm);
     scm_set_smob_print(instance_type, print_instance_scm);
     scm_set_smob_equalp(instance_type, equalp_instance_scm);
-
-    /*
-    scm_t::meta_reg_();
-    builtin::meta_reg_();
-    color::meta_reg_();
-    rect::meta_reg_();
-    image::meta_reg_();
-    mesh_indexed::meta_reg_();
-    dynamic_property::meta_reg_();
-    render_task::meta_reg_();
-    queue_render_task::meta_reg_();
-    provided_render_task::meta_reg_();
-    proc_render_task::meta_reg_();
-    render_target::meta_reg_();
-    render_assets::texture2d::meta_reg_();
-    camera::meta_reg_();
-    transfrm::meta_reg_();
-    */
 
     typedef auto_register_func_guard_<> ar;
     for(size_t i = 0; i < ar::used; i++)

@@ -140,8 +140,6 @@ class shader_render_task : public render_task {
     std::map<std::string, render_assets::property_buffer*> prop_;
     std::map<std::string, render_assets::texture*> prop_tex_;
 
-    mutable bool prop_buf_ref_changed = true;
-
 public:
     shader_render_task() { reset(); }
 
@@ -150,7 +148,6 @@ public:
 
     void set_shader(shader& s) {
         shr_ = &s;
-        prop_buf_ref_changed = true;
     }
 
     void set_target(render_target& t) { target_ = &t; }
@@ -160,7 +157,6 @@ public:
         target_ = &render_target::screen;
         attr_ = nullptr;
         prop_.clear();
-        prop_buf_ref_changed = true;
     }
 
     void set_property(const std::string& name,

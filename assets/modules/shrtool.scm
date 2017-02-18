@@ -22,10 +22,6 @@
 
 (load-extension "libshrtool" "shrtool_init_scm")
 
-(load "shader-def.scm")
-(load "matrix.scm")
-(load "zenity-extension.scm")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public built-in-shader
@@ -105,6 +101,11 @@
        #'(begin ($ inst : func param ...) #nil)))))
 (export $-)
 
+(load "shader-def.scm")
+(load "rtask-def.scm")
+(load "matrix.scm")
+(load "zenity-extension.scm")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define eval-counter 1)
@@ -158,4 +159,17 @@
           (set! eval-counter (+ 1 eval-counter))
           val)
         val))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(import (srfi srfi-1))
+
+(define-public queue-rtask-append*
+  (lambda (qrtask rtasks)
+    (cond
+      ((and (list? rtasks)) ; recusively append
+       (fold (lambda (cur _)
+               (queue-rtask-append qrtask cur))
+         #nil rtasks))
+      (else (queue-rtask-append qrtask rtasks)))))
 

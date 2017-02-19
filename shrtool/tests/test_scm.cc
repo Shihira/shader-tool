@@ -109,7 +109,7 @@ TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
 struct union_fixture : singlefunc_fixture, scm_obj_fixture { };
 
 TEST_CASE_FIXTURE(test_scm_big_news, union_fixture) {
-    def_str("big-news-path", locate_assets("examples/scene.scm"));
+    def_str("big-news-path", locate_assets("examples/blinn-phong-box/scene.scm"));
 
     scm_c_eval_string("(define main-rtask #nil)");
     scm_c_eval_string("(load big-news-path)");

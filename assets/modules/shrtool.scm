@@ -129,18 +129,24 @@
 
 (define-public shrtool-repl-body
   (lambda (str)
-    (let* ((val
+    (let* ((stack #nil)
+           (val
             (catch #t
               (lambda () (eval-body str))
               (lambda (k . a)
                 (cond
-                  ((eq? k 'read-error) #f)
-                  ((eq? k 'quit) #f)
+                  ((eq? k 'read-error) #nil)
+                  ((eq? k 'quit) #nil)
                   (else
                     (display "Uncaught exception: ")
                     (display (cons k a))
                     (newline)))
-                (list #f k a))))
+                    ;(if (not (null? stack))
+                    ;  (display-backtrace stack (current-error-port) 2)
+                    ;  (begin))))
+                (list #f k a))
+              (lambda (k . a)
+                (set! stack (make-stack #t)))))
            (suc (car val))
            (ret (cdr val))
            (varname (string-append "$" (number->string eval-counter))))

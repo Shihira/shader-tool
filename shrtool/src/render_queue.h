@@ -40,6 +40,7 @@ public:
         refl::meta_manager::reg_class<render_task>("rtask")
             .enable_construct<>()
             .enable_auto_register()
+            .function("render", &render_task::render)
             .function("rely_on", &render_task::rely_on)
             .function("reclaim", &render_task::reclaim_reliance)
             .function("is_successor", &render_task::is_successor);

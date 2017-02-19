@@ -483,9 +483,11 @@ struct prop_get_ret_type__<T, typename std::enable_if<
         static const std::unordered_map<from_type, to_type> \
             trans_map_ map_content; \
         auto i_ = trans_map_.find(e); \
-        if(i_ == trans_map_.end()) \
-            throw shrtool::enum_map_error( \
-                    std::string("Failed when mapping ") + #fn); \
+        if(i_ == trans_map_.end())  {\
+            std::stringstream ss; \
+            ss << "Failed when mapping " << #fn << ": " << e; \
+            throw shrtool::enum_map_error(ss.str()); \
+        } \
         return i_->second; \
     }
 

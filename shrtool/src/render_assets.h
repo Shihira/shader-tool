@@ -86,6 +86,9 @@ public:
         DEFAULT_FMT,
         RGBA_U8888,
         R_F32,
+        RG_F32,
+        RGB_F32,
+        RGBA_F32,
         DEPTH_F32,
     };
 

@@ -3,8 +3,8 @@
 (define meshes
   (list (mesh-gen-box 2 2 2)
         (mesh-gen-plane 10 10 1 1)
-        (mesh-gen-plane 3 10 1 1)
-        (mesh-gen-plane 10 3 1 1)
+        (mesh-gen-box 3 0.2 10)
+        (mesh-gen-box 10 0.2 3)
         (mesh-gen-uv-sphere 0.5 20 10 #t)
         (mesh-gen-uv-sphere 0.8 10 5 #f)))
 
@@ -33,17 +33,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define shadow-map-shader
-  (shader-from-config (include "shadow-map.scm")))
+  (shader-from-config (load "shadow-map.scm")))
 
 (define light-transfrm
   (make-instance transfrm '()
     (translate 0 0 10)
     (rotate (/ pi 6) 'yOz)
-    (rotate (/ pi -8) 'zOx)))
+    (rotate (/ pi -1.7) 'zOx)))
 
 (define light-cam
   (make-instance camera '()
     (attach-texture 'depth-buffer shadow-map-tex)
+    (set-visible-angle (/ pi 1.8))
     (set-depth-test #t)
     (set-transformation light-transfrm)))
 
@@ -68,7 +69,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define main-shader
-  (shader-from-config (include "blinn-phong-with-shadow.scm")))
+  (shader-from-config (load "blinn-phong-with-shadow.scm")))
 
 (define cam-transfrm
   (make-instance transfrm '()
@@ -85,6 +86,8 @@
 
 (define propset-illum
   (make-instance propset '()
+    (append-float 0.003)
+    (append 2)
     (append (make-color #xffffffff))))
 
 (define propset-material
@@ -119,4 +122,11 @@
     (append* shadow-map-rtasks)
     (append* screen-rtasks)
     (append (car shadow-map-display-rtask))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; utility functions
+
+(define rotate-light
+  (lambda* (#:key (angle (/ pi 120)))
+    ($- ($ light-cam : transformation) : rotate angle 'zOx)))
 

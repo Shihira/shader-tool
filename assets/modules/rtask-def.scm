@@ -58,8 +58,7 @@
            (shader (shader-from-config
                      (display-texture-config procColor procCoord)))
            (cam (make-instance camera '()
-                  (set-depth-test #f)
-                  (set-bgcolor (make-color #xff220000))))
+                  (set-depth-test #f)))
            (rtask (make-instance shading-rtask '()
                     (set-attributes mesh)
                     (set-shader shader)

@@ -810,7 +810,7 @@ inline instance meta::apply(const std::string& name, instance* i[], size_t n) co
 
     auto fi = functions.find(name);
     if(fi == functions.end())
-        throw not_found_error("No such function: " + name);
+        throw not_found_error(this->name() + " do not have function: " + name);
     fun_type f = fi->second;
     instance ins = f(i, n);
 

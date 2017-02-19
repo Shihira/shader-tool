@@ -52,6 +52,9 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
 
         { "rgba-u8888", render_assets::texture::RGBA_U8888 },
         { "r-f32", render_assets::texture::R_F32 },
+        { "rg-f32", render_assets::texture::RG_F32 },
+        { "rgb-f32", render_assets::texture::RGB_F32 },
+        { "rgba-f32", render_assets::texture::RGBA_F32 },
         { "depth-f32", render_assets::texture::DEPTH_F32 },
         { "default-fmt", render_assets::texture::DEFAULT_FMT },
     }))
@@ -91,6 +94,8 @@ struct builtin {
 
     static image texture_to_image(render_assets::texture& tex,
             render_assets::texture::format fmt) {
+        if(fmt != render_assets::texture::RGBA_U8888) throw unsupported_error(
+                "cannot read texture of this format into an image");
         image img(tex.get_width(), tex.get_height() * tex.get_depth());
         tex.read(img.data(), fmt);
         return std::move(img);

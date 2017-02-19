@@ -73,6 +73,8 @@ public:
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, ver_1);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, ver_2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, prof);
+        glfwWindowHint(GLFW_SAMPLES, 4);
+        glEnable(GL_MULTISAMPLE);
 
         window = glfwCreateWindow(w, h, title.c_str(), NULL, NULL);
 
@@ -160,8 +162,10 @@ int main(int argc, char* argv[])
     scm_c_eval_string("(import (shrtool))");
     scm_c_eval_string("(define main-rtask #nil)");
 
-    if(argc > 1)
-        scm_c_primitive_load(argv[1]);
+    if(argc == 3 && !strcmp(argv[1], "-c"))
+        scm_call_1(
+            scm_c_public_ref("shrtool", "shrtool-repl-body"),
+            scm_from_latin1_string(argv[2]));
 
     rl_callback_handler_install(DEFAULT_PROMPT, has_input);
     atexit(rl_callback_handler_remove);

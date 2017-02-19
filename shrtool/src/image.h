@@ -101,6 +101,7 @@ public:
             .function("flip_v", &image::flip_v)
             .function("width", &image::width)
             .function("height", &image::height)
+            .function("extract_cubemap", load_cubemap_from)
             .function("pixel", static_cast<color&(image::*)(size_t, size_t)>(&image::pixel));
     }
 };

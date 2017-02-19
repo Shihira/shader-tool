@@ -11,18 +11,27 @@ namespace render_assets {
 DEF_ENUM_MAP(em_format_component_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_RGBA },
         { texture::R_F32, GL_R },
+        { texture::RG_F32, GL_RG },
+        { texture::RGB_F32, GL_RGB },
+        { texture::RGBA_F32, GL_RGBA },
         { texture::DEPTH_F32, GL_DEPTH_COMPONENT },
     }))
 
 DEF_ENUM_MAP(em_format_type_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_UNSIGNED_BYTE },
         { texture::R_F32, GL_FLOAT },
+        { texture::RG_F32, GL_FLOAT },
+        { texture::RGB_F32, GL_FLOAT },
+        { texture::RGBA_F32, GL_FLOAT },
         { texture::DEPTH_F32, GL_FLOAT },
     }))
 
 DEF_ENUM_MAP(em_format_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_RGBA8 },
         { texture::R_F32, GL_R32F },
+        { texture::RG_F32, GL_RG32F },
+        { texture::RGB_F32, GL_RGB32F },
+        { texture::RGBA_F32, GL_RGBA32F },
         { texture::DEPTH_F32, GL_DEPTH_COMPONENT32F },
     }))
 
@@ -31,6 +40,9 @@ DEF_ENUM_MAP(em_format_size_, texture::format, size_t, ({
         // cause segmentation fault
         { texture::RGBA_U8888, 4 },
         { texture::R_F32, 4 },
+        { texture::RG_F32, 8 },
+        { texture::RGB_F32, 12 },
+        { texture::RGBA_F32, 16 },
         { texture::DEPTH_F32, 4 },
     }))
 

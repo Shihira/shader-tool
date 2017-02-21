@@ -146,6 +146,8 @@ void shader::property_binding(const std::string& name, size_t binding) {
 
     glUseProgram(id());
     GLuint idx = glGetUniformBlockIndex(id(), name.c_str());
+    if(idx == GL_INVALID_INDEX)
+        warning_log << "Unable to find uniform name " << name << std::endl;
     glUniformBlockBinding(id(), idx, binding);
     glUseProgram(GL_NONE);
 
@@ -199,6 +201,27 @@ void shader::draw(const vertex_attr_vector& vat) const {
         glEnable(GL_DEPTH_TEST);
     else
         glDisable(GL_DEPTH_TEST);
+
+    switch(target_->get_draw_face()) {
+        case 0: glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
+        case 1: glEnable(GL_CULL_FACE); glCullFace(GL_BACK); break;
+        case 2: glEnable(GL_CULL_FACE); glCullFace(GL_FRONT); break;
+        case 3: glDisable(GL_CULL_FACE); break;
+    }
+
+    switch(target_->get_blend_func()) {
+        case render_target::OVERRIDE_BLEND:
+            glDisable(GL_BLEND);
+            break;
+        case render_target::ALPHA_BLEND:
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
+            break;
+        case render_target::PLUS_BLEND:
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
+            break;
+    }
 
     target_->apply_viewport();
 

@@ -24,7 +24,7 @@
     (make-instance transfrm '()
       (translate -0.5 1.5 0))
     (make-instance transfrm '()
-      (translate 2 -0.05 1))))
+      (translate 2 -0.2 1))))
 
 (define shadow-map-tex
   (make-instance texture2d '(1024 1024)

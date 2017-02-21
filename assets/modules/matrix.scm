@@ -7,13 +7,14 @@
 (define-public pi 3.14159265358979)
 
 (define-public mat-zeros
-  (lambda (m n)
-    (make-typed-array 'f32 0 m n)))
+  (lambda* (m n #:optional (type 'f32))
+    (make-typed-array type 0 m n)))
 
 (define-public mat?
-  (lambda (A)
+  (lambda* (A #:optional (type #nil))
     (and
-      (eq? (array-type A) 'f32)
+      (if (not (null? type))
+          (eq? (array-type A) type) #t)
       (eq? (array-rank A) 2))))
 
 (define-public mat-size
@@ -127,8 +128,8 @@
 (define-public mat-eq? array-equal?)
 
 (define-public list->mat
-  (lambda (l)
-    (list->typed-array 'f32 '(0 0) l)))
+  (lambda* (l #:optional (type 'f32))
+    (list->typed-array type '(0 0) l)))
 
 (define-public make-mat
   (lambda (. l)
@@ -145,12 +146,12 @@
       (list->mat final))))
 
 (define-public list->rvec
-  (lambda (l)
-    (list->mat (list l))))
+  (lambda* (l #:optional (type 'f32))
+    (list->mat (list l) type)))
 
 (define-public list->cvec
-  (lambda (l)
-    (mat-t (list->rvec l))))
+  (lambda* (l #:optional (type 'f32))
+    (mat-t (list->rvec l type))))
 
 (define-public mat-cvec
   (lambda (. l)

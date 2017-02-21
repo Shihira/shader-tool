@@ -49,6 +49,14 @@ public:
         DEPTH_BUFFER,
     };
 
+    enum draw_face_name : size_t {
+        NO_FACE = 0, FRONT_FACE = 1, BACK_FACE = 2, BOTH_FACE = 3,
+    };
+
+    enum blend_func_name {
+        OVERRIDE_BLEND, ALPHA_BLEND, PLUS_BLEND,
+    };
+
 protected:
     std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
     rect viewport_;
@@ -57,8 +65,11 @@ public:
     PROPERTY_RW(color, bgcolor)
     PROPERTY_RW(float, infdepth)
     PROPERTY_RW(bool, depth_test)
+    PROPERTY_RW(draw_face_name, draw_face)
+    PROPERTY_RW(blend_func_name, blend_func)
 
-    render_target() : infdepth_(1), depth_test_(false) { }
+    render_target() : infdepth_(1), depth_test_(false),
+        draw_face_(BOTH_FACE), blend_func_(OVERRIDE_BLEND) { }
 
     void attach_texture(buffer_attachment ba, render_assets::texture& tex);
 
@@ -104,6 +115,10 @@ public:
             .function("get_bgcolor", &render_target::get_bgcolor)
             .function("set_depth_test", &render_target::set_depth_test)
             .function("get_depth_test", &render_target::get_depth_test)
+            .function("set_draw_face", &render_target::set_draw_face)
+            .function("get_draw_face", &render_target::get_draw_face)
+            .function("set_blend_func", &render_target::set_blend_func)
+            .function("get_blend_func", &render_target::get_blend_func)
             .function("is_screen", &render_target::is_screen)
             .function("attach_texture", &render_target::attach_texture);
     }

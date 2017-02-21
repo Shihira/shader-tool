@@ -50,6 +50,15 @@ DEF_ENUM_MAP(em_scm_enum_tranform__, std::string, size_t, ({
         { "color-buffer-1", render_target::COLOR_BUFFER_2 },
         { "depth-buffer", render_target::DEPTH_BUFFER },
 
+        { "no-face", render_target::NO_FACE },
+        { "front-face", render_target::FRONT_FACE },
+        { "back-face", render_target::BACK_FACE },
+        { "both-face", render_target::BOTH_FACE },
+
+        { "override-blend", render_target::OVERRIDE_BLEND },
+        { "alpha-blend", render_target::ALPHA_BLEND },
+        { "plus-blend", render_target::PLUS_BLEND },
+
         { "rgba-u8888", render_assets::texture::RGBA_U8888 },
         { "r-f32", render_assets::texture::R_F32 },
         { "rg-f32", render_assets::texture::RG_F32 },
@@ -503,10 +512,9 @@ void parse_shader_from_scm(scm_t shader_list_, shader_info& s)
             ssi.version = scm_to_latin1_string(map_idx(alist, "version"));
             ssi.source = scm_to_latin1_string(map_idx(alist, "source"));
 
-            if(is_symbol_eq(map_idx(alist, "type"), "fragment"))
-                ssi.type = shader::FRAGMENT;
-            if(is_symbol_eq(map_idx(alist, "type"), "vertex"))
-                ssi.type = shader::VERTEX;
+            const char* type = scm_to_latin1_string(
+                    scm_symbol_to_string(map_idx(alist, "type")));
+            ssi.type = (shader::shader_type) em_scm_enum_tranform__(type);
 
             s.sub_shaders.push_back(std::move(ssi));
         }

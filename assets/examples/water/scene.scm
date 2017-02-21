@@ -88,15 +88,16 @@
 
 (define cam-transfrm
   (make-instance transfrm '()
-    (translate 0 0 3)
-    
-    (rotate (/ pi 8) 'yOz)(rotate (/ pi 6) 'zOx)))
+    (translate 0 -0.3 3)
+    (rotate (/ pi 8) 'yOz)
+    (rotate (/ pi 1.1) 'zOx)))
 
 (define screen-cam
   (make-instance camera '()
-    (set-bgcolor #xff333333)
+    (set-bgcolor #xff111111)
     (set-depth-test #t)
     (set-visible-angle (/ pi 8.4))
+    (set-draw-face 'back-face)
     (set-transformation cam-transfrm)))
 
 (define screen-clear-rtask
@@ -105,22 +106,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; water surface rendering
 
-(define water-surf-env-map
-  ($ (built-in-image "skybox-texture-small") : extract-cubemap))
-
 (define water-surf-plane
-  (mesh-gen-plane 1 1 hf-grids hf-grids))
+  (mesh-gen-plane 1 1 (- hf-grids 3) (- hf-grids 3)))
 
 (define water-surf-transfrm
   (make-instance transfrm '()))
 
-(define water-surf-shader
-  (shader-from-config (load "water-surface.scm")))
-
 (define water-surf-propset-illum
   (make-instance propset '()
-    (append (mat-cvec 4 2 4 1))
+    (append (mat-cvec -4 1 -2 1))
     (append (make-color #xffffffff))))
+
+(define water-surf-env-map
+  ($ (built-in-image "skybox-texture-small-2") : extract-cubemap))
+
+(define water-surf-shader
+  (shader-from-config (load "water-surface.scm")))
 
 (define water-surf-propset-material
   (make-instance propset '()
@@ -144,15 +145,110 @@
          ($ water-surf-rtask : set-texture "hfMap" (cadr hf-texs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; caustics rendering
+
+(define caustics-tex
+  (make-instance texture2d '(1024 1024)
+    (reserve 'rg-f32)))
+
+(define caustics-shader
+  (shader-from-config (load "caustics.scm")))
+
+(define caustics-cam
+  (make-instance camera '()
+    (set-depth-test #f)
+    (set-bgcolor #xff000000)
+    (set-near-clip-plane 0.5)
+    (set-far-clip-plane 1.5)
+    (set-visible-angle (/ pi 2))
+    (set-blend-func 'plus-blend)
+    (attach-texture 'color-buffer-0 caustics-tex)))
+
+($ ($ caustics-cam : transformation) : translate 0 0 0.5)
+($ ($ caustics-cam : transformation) : rotate (/ pi 2) 'yOz)
+
+(define caustics-rtask
+  (make-instance shading-rtask '()
+    (set-shader caustics-shader)
+    (set-attributes water-surf-plane)
+    (set-property-camera "camera" caustics-cam)
+    (set-property "illum" water-surf-propset-illum)
+    (set-target caustics-cam)))
+
+(define pre-caustics-rtask
+  (make-instance proc-rtask
+    `(,(lambda ()
+         ($ caustics-rtask : set-texture "hfMap" (cadr hf-texs))))))
+
+(define caustics-display-rtask
+  (rtask-def-display-texture caustics-tex #:channel 'r))
+(define caustics-clear-rtask
+  (rtask-def-clear caustics-cam '(color-buffer)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; pool 
+
+(define wall-propset-material
+  (make-instance propset '()
+    (append (make-color #xfff5cf83))))
+
+(define wall-meshes
+  (list (mesh-gen-plane 1 1 1 1)
+        (mesh-gen-plane 0.5 1 1 1)
+        (mesh-gen-plane 0.5 1 1 1)
+        (mesh-gen-plane 1 0.5 1 1)
+        (mesh-gen-plane 1 0.5 1 1)))
+
+(define wall-transfrms
+  (list
+    (make-instance transfrm '()
+      (translate 0 -0.5 0))
+    (make-instance transfrm '()
+      (rotate (/ pi 2) 'xOy)
+      (translate 0.5 -0.25 0))
+    (make-instance transfrm '()
+      (rotate (/ pi -2) 'xOy)
+      (translate -0.5 -0.25 0))
+    (make-instance transfrm '()
+      (rotate (/ pi 2) 'yOz)
+      (translate 0 -0.25 0.5))
+    (make-instance transfrm '()
+      (rotate (/ pi -2) 'yOz)
+      (translate 0 -0.25 -0.5))))
+
+(define wall-shader
+  (shader-from-config (load "pool-wall.scm")))
+
+(define wall-rtasks
+  (map (lambda (msh tf)
+         (make-instance shading-rtask '()
+           (set-target screen-cam)
+           (set-attributes msh)
+           (set-shader wall-shader)
+           (set-texture "causticsMap" caustics-tex)
+           (set-property "material" wall-propset-material)
+           (set-property "illum" water-surf-propset-illum)
+           (set-property-transfrm "transfrm" tf)
+           (set-property-camera "camera" screen-cam)
+           (set-property-camera "causticsCamera" caustics-cam)))
+    wall-meshes wall-transfrms))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; main-rtask
 
 (define main-rtask
   (make-instance queue-rtask '()
+    (append (car screen-clear-rtask))
     (append pre-hf-rtask)
     (append hf-rtask)
-    ;(append pre-hf-texdisp-rtask)
-    ;(append (car hf-texdisp-rtask))))
-    (append (car screen-clear-rtask))
+   ;(append pre-hf-texdisp-rtask)
+   ;(append (car hf-texdisp-rtask))))
+    (append pre-caustics-rtask)
+    (append (car caustics-clear-rtask))
+    (append caustics-rtask)
+    (append* wall-rtasks)
+   ;(append (car caustics-display-rtask))))
     (append pre-water-surf-rtask)
     (append water-surf-rtask)))
 
@@ -165,11 +261,17 @@
   (lambda* (#:optional
              (x (random-integer hf-grids))
              (y (random-integer hf-grids))
-            #:key (r 10) (s 8))
+            #:key (r (* 5 pi)) (s 5))
     ($ dist-propset : set 0 2)
     ($ dist-propset : set 1 (mat-cvec x y))
     ($ dist-propset : set-float 2 r)
     ($ dist-propset : set-float 3 s)
+    ($ pre-dist-rtask : render)
+    ($ dist-rtask : render)))
+
+(define reset-water
+  (lambda ()
+    ($ dist-propset : set 0 1)
     ($ pre-dist-rtask : render)
     ($ dist-rtask : render)))
 

@@ -150,7 +150,7 @@ public:
 
     virtual void read(void* data, format fmt = DEFAULT_FMT);
 
-    virtual void bind_to(size_t tex_bind) const;
+    virtual void bind_to(int tex_bind) const;
     virtual void attach_to(size_t tex_attachment);
 
     static void meta_reg_() {
@@ -203,6 +203,7 @@ public:
         set_trait(CUBEMAP);
     }
 
+    virtual void attach_to(size_t tex_attachment) override;
     virtual void fill(const void* data, format fmt = DEFAULT_FMT) override;
 
     virtual void fill_rect(
@@ -211,6 +212,14 @@ public:
             const void* data, format fmt = DEFAULT_FMT) override;
 
     virtual void read(void* data, format fmt = DEFAULT_FMT) override;
+
+    static void meta_reg_() {
+        refl::meta_manager::reg_class<texture_cubemap>("texture_cubemap")
+            .enable_construct<size_t>()
+            .enable_construct<size_t, format>()
+            .enable_base<texture>()
+            .enable_auto_register();
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

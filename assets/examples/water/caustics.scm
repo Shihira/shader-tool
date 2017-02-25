@@ -85,15 +85,16 @@
                    (worldPos[2] - worldPos[1]).xyz
                ));
            area /= pow(cellSize, 2);
-           area = max(area, 0.000001);
 
-           strength = clamp(1 / area, 0, 10);
+           strength = clamp(1 / area, 0, 2);
 
            for(int i = 0; i < gl_in.length(); i++) {
                gl_Position = gl_in[i].gl_Position;
                fragPosition = worldPos[i];
                EmitVertex();
            }
+
+          EndPrimitive();
        }"))
    (sub-shader
      (type . fragment)

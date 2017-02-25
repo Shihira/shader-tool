@@ -123,8 +123,13 @@ render_task* main_rtask = nullptr;
 void has_input(char* line)
 {
     rl_callback_handler_remove();
-    if(!line) return dw.quit();
-    full_input += line;
+
+    if(!line) { // if not half-way, EOF means exit
+        if(full_input.empty())
+            return dw.quit();
+        else
+            full_input.clear();
+    } else full_input += line;
 
     SCM val = scm_call_1(
             scm_c_public_ref("shrtool", "shrtool-repl-body"),

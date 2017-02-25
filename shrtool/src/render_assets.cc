@@ -10,7 +10,7 @@ namespace render_assets {
 
 DEF_ENUM_MAP(em_format_component_, texture::format, GLenum, ({
         { texture::RGBA_U8888, GL_RGBA },
-        { texture::R_F32, GL_R },
+        { texture::R_F32, GL_RED },
         { texture::RG_F32, GL_RG },
         { texture::RGB_F32, GL_RGB },
         { texture::RGBA_F32, GL_RGBA },
@@ -113,9 +113,7 @@ GLenum get_texture_type(const texture& t)
 void generic_fill(texture& t, const void* data, texture::format fmt,
         GLenum tex_type, GLenum bind_tex_type, size_t dim, bool opt = true)
 {
-    bool first_time = t.vacuum();
-
-    if(first_time) {
+    if(t.vacuum()) {
         if(!t.get_width() * t.get_height() * t.get_depth())
             throw restriction_error("Size of texture cannot be zero");
 
@@ -159,12 +157,12 @@ void generic_fill(texture& t, const void* data, texture::format fmt,
             data
         );
 
-    if(first_time && opt) {
+    if(opt) {
         glTexParameteri(bind_tex_type, GL_TEXTURE_MAG_FILTER,
                 em_filter_type_(t.get_filter()));
         glTexParameteri(bind_tex_type, GL_TEXTURE_MIN_FILTER,
                 em_filter_type_(t.get_filter()));
-        if(data) glGenerateMipmap(bind_tex_type);
+        glGenerateMipmap(bind_tex_type);
     }
 
     glBindTexture(bind_tex_type, GL_NONE);
@@ -210,7 +208,7 @@ void generic_fill_rect(texture& t,
 }
 
 void generic_read(texture& t,
-        void* data, texture::format fmt, GLenum tex_type)
+        void* data, texture::format fmt, GLenum bind_tex_type, GLenum tex_type)
 {
     if(t.vacuum())
         throw restriction_error("Texture is not yet initailized.");
@@ -218,19 +216,19 @@ void generic_read(texture& t,
     if(fmt == texture::DEFAULT_FMT)
         fmt = t.get_internal_format();
 
-    glBindTexture(tex_type, t.id());
+    glBindTexture(bind_tex_type, t.id());
     glGetTexImage(tex_type, 0,
             em_format_component_(fmt), em_format_type_(fmt), data);
-    glBindTexture(tex_type, GL_NONE);
+    glBindTexture(bind_tex_type, GL_NONE);
 }
 
 void texture::fill(const void* data, format fmt) {
     GLenum tex_type = get_texture_type(*this);
 
     if(get_depth() == 1)
-        generic_fill(*this, data, fmt, tex_type, tex_type, 2);
+        generic_fill(*this, data, fmt, tex_type, tex_type, 2, vacuum());
     else if(get_depth() > 1)
-        generic_fill(*this, data, fmt, tex_type, tex_type, 3);
+        generic_fill(*this, data, fmt, tex_type, tex_type, 3, vacuum());
 }
 
 void texture::fill_rect(
@@ -251,13 +249,18 @@ void texture::fill_rect(
 
 void texture::read(void* data, texture::format fmt)
 {
-    generic_read(*this, data, fmt, get_texture_type(*this));
+    GLenum tex_type = get_texture_type(*this);
+    generic_read(*this, data, fmt, tex_type, tex_type);
 }
 
-void texture::bind_to(size_t tex_bind) const
+void texture::bind_to(int tex_bind) const
 {
-    glActiveTexture(GL_TEXTURE0 + tex_bind);
-    glBindTexture(get_texture_type(*this), id());
+    if(tex_bind < 0)
+        glBindTexture(get_texture_type(*this), GL_NONE);
+    else {
+        glActiveTexture(GL_TEXTURE0 + tex_bind);
+        glBindTexture(get_texture_type(*this), id());
+    }
 }
 
 void texture::attach_to(size_t tex_attachment)
@@ -267,8 +270,7 @@ void texture::attach_to(size_t tex_attachment)
 
     GLenum tex_type = get_texture_type(*this);
     glBindTexture(tex_type, id());
-    glFramebufferTexture2D(GL_FRAMEBUFFER, tex_attachment,
-            tex_type, id(), 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, tex_attachment, id(), 0);
     glBindTexture(tex_type, GL_NONE);
 }
 
@@ -287,11 +289,11 @@ void texture_cubemap::fill(const void* data, format fmt) {
     }
 
     glBindTexture(GL_TEXTURE_CUBE_MAP, id());
-    if(data) glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S,  
             GL_CLAMP_TO_EDGE);  
     glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T,  
             GL_CLAMP_TO_EDGE);  
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
 }
 
@@ -321,10 +323,14 @@ void texture_cubemap::read(void* data, texture::format fmt)
 
     for(size_t i = 0; i < 6; i++) {
         generic_read(*this, ptr_data + size * i, fmt,
+                GL_TEXTURE_CUBE_MAP,
                 GL_TEXTURE_CUBE_MAP_POSITIVE_X + i);
     }
+}
 
-    if(data) glGenerateMipmap(get_texture_type(*this));
+void texture_cubemap::attach_to(size_t tex_attachment)
+{
+    /* do nothing, thing are done in shading step */
 }
 
 ////////////////////////////////////////////////////////////////////////////////

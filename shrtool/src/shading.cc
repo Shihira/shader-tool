@@ -29,10 +29,12 @@ DEF_ENUM_MAP(em_buffer_attachment_, render_target::buffer_attachment, GLenum, ({
         { render_target::DEPTH_BUFFER,   GL_DEPTH_ATTACHMENT },
     }))
 
+/*
 DEF_ENUM_MAP(em_clear_mask_, render_target::buffer_attachment, GLenum, ({
         { render_target::COLOR_BUFFER, GL_COLOR },
         { render_target::DEPTH_BUFFER, GL_DEPTH },
     }))
+*/
 
 DEF_ENUM_MAP(em_element_type_, element_type::element_type_e, GLenum, ({
         { element_type::FLOAT, GL_FLOAT },
@@ -100,6 +102,8 @@ void render_target::attach_texture(
 
     glBindFramebuffer(GL_FRAMEBUFFER, id());
     tex.attach_to(em_buffer_attachment_(ba));
+    if(ba != DEPTH_BUFFER)
+        glDrawBuffer(em_buffer_attachment_(ba));
 
     set_viewport(rect::from_size(tex.get_width(), tex.get_height()));
 
@@ -115,18 +119,33 @@ void render_target::apply_viewport() const
 
 void render_target::clear_buffer(render_target::buffer_attachment ba) const {
     glBindFramebuffer(GL_FRAMEBUFFER, id());
-    apply_viewport();
-    if(ba == COLOR_BUFFER) {
-        fcolor c = bgcolor_;
-        glClearBufferfv(em_clear_mask_(ba), 0, c.data.floats);
-    } else if(ba > COLOR_BUFFER && ba < COLOR_BUFFER_MAX) {
-        fcolor c = bgcolor_;
-        glClearBufferfv(em_clear_mask_(ba),
-                ba - COLOR_BUFFER_0, c.data.floats);
-    } else if(ba == DEPTH_BUFFER) {
-        glDepthFunc(GL_LESS);
-        glClearBufferfv(em_clear_mask_(ba), 0, &infdepth_);
+
+    auto tbi = tex_attachments_.find(ba);
+    int clear_pass = 1;
+    if(tbi != tex_attachments_.end() &&
+            tbi->second->get_trait() & texture::CUBEMAP) {
+        clear_pass = 6;
     }
+
+    apply_viewport();
+
+    for(int i = 0; i < clear_pass; i++) {
+
+        if(clear_pass == 6)
+            glFramebufferTexture2D(GL_FRAMEBUFFER, em_buffer_attachment_(ba),
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tbi->second->id(), 0);
+
+        if(ba == COLOR_BUFFER) {
+            fcolor c = bgcolor_;
+            glClearColor(c.r(), c.g(), c.b(), c.a());
+            glClear(GL_COLOR_BUFFER_BIT);
+        } else if(ba == DEPTH_BUFFER) {
+            glDepthFunc(GL_LESS);
+            glClearDepth(infdepth_);
+            glClear(GL_DEPTH_BUFFER_BIT);
+        }
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
@@ -203,10 +222,14 @@ void shader::draw(const vertex_attr_vector& vat) const {
         glDisable(GL_DEPTH_TEST);
 
     switch(target_->get_draw_face()) {
-        case 0: glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
-        case 1: glEnable(GL_CULL_FACE); glCullFace(GL_BACK); break;
-        case 2: glEnable(GL_CULL_FACE); glCullFace(GL_FRONT); break;
-        case 3: glDisable(GL_CULL_FACE); break;
+        case render_target::NO_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
+        case render_target::FRONT_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_BACK); break;
+        case render_target::BACK_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT); break;
+        case render_target::BOTH_FACE:
+            glDisable(GL_CULL_FACE); break;
     }
 
     switch(target_->get_blend_func()) {
@@ -215,7 +238,7 @@ void shader::draw(const vertex_attr_vector& vat) const {
             break;
         case render_target::ALPHA_BLEND:
             glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_DST_ALPHA);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             break;
         case render_target::PLUS_BLEND:
             glEnable(GL_BLEND);
@@ -233,10 +256,31 @@ void shader::draw(const vertex_attr_vector& vat) const {
         tex_num += 1;
     }
 
-    glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+    int render_passes = 1;
+    auto tbi = target_->tex_attachments_.find(render_target::COLOR_BUFFER_0);
+    if(tbi != target_->tex_attachments_.end() &&
+            tbi->second->get_trait() & texture::CUBEMAP) {
+        render_passes = 6;
+    }
+
+    for(int rp = 0; rp < render_passes; rp++) {
+        if(render_passes == 6) {
+            glBindTexture(GL_TEXTURE_CUBE_MAP, tbi->second->id());
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + rp, tbi->second->id(), 0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
+            glUniform1i(glGetUniformLocation(id(), "cubemapPass_"), rp);
+        }
+        glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(GL_NONE);
     glUseProgram(GL_NONE);
+
+    for(auto& e : textures_binding_) {
+        e.second->bind_to(-1);
+    }
 }
 
 void shader::link() {
@@ -252,9 +296,9 @@ void shader::link() {
     if(status == GL_FALSE) {
         GLint log_len, actual_log_len;
         glGetProgramiv(id(), GL_INFO_LOG_LENGTH, &log_len);
-        char* log_str = new char[log_len + 1];
-        glGetProgramInfoLog(id(), log_len + 1, &actual_log_len, log_str);
-        throw shader_error(std::string("Error while linking:\n") + log_str);
+        std::vector<char> log_str(log_len);
+        glGetProgramInfoLog(id(), log_len, &actual_log_len, log_str.data());
+        throw shader_error(std::string("Error while linking:\n") + log_str.data());
     }
 }
 
@@ -271,10 +315,10 @@ void sub_shader::compile(const std::string& s) {
     if(status == GL_FALSE) {
         GLint log_len, actual_log_len;
         glGetShaderiv(id(), GL_INFO_LOG_LENGTH, &log_len);
-        char* log_str = new char[log_len + 1];
-        glGetShaderInfoLog(id(), log_len + 1, &actual_log_len, log_str);
+        std::vector<char> log_str(log_len);
+        glGetShaderInfoLog(id(), log_len + 1, &actual_log_len, log_str.data());
         throw shader_error(std::string("Error while compiling ")
-                + em_shader_type_str_(type_) + ":\n" + log_str);
+                + em_shader_type_str_(type_) + ":\n" + log_str.data());
     }
 }
 

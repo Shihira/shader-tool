@@ -26,6 +26,12 @@
   (lambda (A)
     (apply mat-zeros (mat-size A))))
 
+(define-public mat-cast
+  (lambda (type A)
+    (let ((M (mat-zeros-like A)))
+      (array-copy! A M)
+      M)))
+
 (define-public mat-col-count
   (lambda (A)
     (cadr (mat-size A))))
@@ -76,22 +82,22 @@
     (mat-diagonal (list->rvec (list x y z 1)))))
 
 (define-public mat-rotate-4
-  (lambda (axis angle)
+  (lambda (angle axis)
     (let ((c (cos angle))
           (s (sin angle))
           (n (- (sin angle))))
       (cond
-        ((eq? axis 'x)
+        ((eq? axis 'yOz)
          (make-mat 1 0 0 0 ':
                    0 c s 0 ':
                    0 n c 0 ':
                    0 0 0 1 ':))
-        ((eq? axis 'y)
+        ((eq? axis 'zOx)
          (make-mat c 0 n 0 ':
                    0 1 0 0 ':
                    s 0 c 0 ':
                    0 0 0 1 ':))
-        ((eq? axis 'z)
+        ((eq? axis 'xOy)
          (make-mat c s 0 0 ':
                    n c 0 0 ':
                    0 0 1 0 ':

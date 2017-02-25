@@ -1,6 +1,6 @@
 (use-modules (shrtool))
 
-`((name . "pool-wall")
+`((name . "environ-map")
   ,shader-def-attr-mesh
   ,(shader-def-prop-transfrm)
   ,(shader-def-prop-camera)
@@ -15,10 +15,16 @@
     (layout
       (col4 . "lightPosition")
       (color . "lightColor")))
+  (property-group
+    (name . "multiCamera")
+    (layout
+      (mat4 . "vpMats[6]")))
   (sub-shader
     (type . vertex)
     (version . "330 core")
     (source . "
+      uniform int cubemapPass_;
+
       out vec4 worldPos;
       out vec3 fragNormal;
 
@@ -29,8 +35,9 @@
 
           fragNormal = (transpose(mMatrix_inv) * vec4(normal, 0)).xyz;
           fragNormal = normalize(fragNormal);
-
-          gl_Position = vpMatrix * worldPos;
+          if(dot(worldPos.xyz, fragNormal) > 0)
+              fragNormal = -fragNormal;
+          gl_Position = vpMats[cubemapPass_] * worldPos;
       }"))
   (sub-shader
     (type . fragment)
@@ -43,8 +50,7 @@
 
       void main()
       {
-          if(worldPos.y > 0)
-              discard;
+          if(worldPos.y > 0) discard;
 
           vec4 causPos = caus_vpMatrix * worldPos;
           causPos /= causPos.w;

@@ -42,7 +42,7 @@
           f *= v * v;
 
           outInfo.g += f * dt;
-          outInfo.g *= 0.998;
+          outInfo.g *= 0.995;
           outInfo.r += outInfo.g * dt;
       }"))
   (sub-shader

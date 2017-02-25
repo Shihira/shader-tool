@@ -21,7 +21,6 @@
     (source . "
       in vec4 fragPosition;
       in vec3 fragNormal;
-      in vec2 fragUV;
 
       out vec4 outColor;
 
@@ -39,13 +38,11 @@
     (source . "
       out vec4 fragPosition;
       out vec3 fragNormal;
-      out vec2 fragUV;
 
       void main() {
           fragNormal = (transpose(mMatrix_inv) * vec4(normal, 0)).xyz;
 
-          gl_Position = vpMatrix * mMatrix * position;
           fragPosition = mMatrix * position;
           fragPosition /= fragPosition.w;
-          fragUV = (uv / uv.z).xy;
+          gl_Position = vpMatrix * fragPosition;
       }")))

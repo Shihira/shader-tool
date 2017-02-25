@@ -145,6 +145,17 @@ TEST_CASE(test_uv_sphere) {
     }
 }
 
+TEST_CASE(test_plane) {
+    mesh_plane pl(1, 1, 5, 5);
+
+    for(size_t t = 0; t < pl.triangles(); t++) {
+        double res = norm(cross(
+            (pl.get_position(t, 1) - pl.get_position(t, 0)).cutdown<col3>(),
+            (pl.get_position(t, 2) - pl.get_position(t, 1)).cutdown<col3>()));
+        assert_true(res > 0.000001);
+    }
+}
+
 #include "providers.h"
 
 int main(int argc, char* argv[])

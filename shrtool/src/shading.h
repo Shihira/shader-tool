@@ -41,7 +41,7 @@ class render_target : public lazy_id_object_<render_target> {
 public:
     enum buffer_attachment {
         COLOR_BUFFER,
-        COLOR_BUFFER_0,
+        COLOR_BUFFER_0 = COLOR_BUFFER,
         COLOR_BUFFER_1,
         COLOR_BUFFER_2,
         COLOR_BUFFER_3,
@@ -58,10 +58,12 @@ public:
     };
 
 protected:
-    std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
     rect viewport_;
+    std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
+    friend class shader;
 
 public:
+
     PROPERTY_RW(color, bgcolor)
     PROPERTY_RW(float, infdepth)
     PROPERTY_RW(bool, depth_test)
@@ -148,8 +150,8 @@ protected:
     std::unordered_map<shader_type, sub_shader_ptr> sub_shaders_;
 
     size_t max_binding_index_ = 0;
-    std::unordered_map<std::string, size_t> property_binding_;
-    std::unordered_map<size_t, const render_assets::texture*> textures_binding_;
+    std::map<std::string, size_t> property_binding_;
+    std::map<size_t, const render_assets::texture*> textures_binding_;
 
     render_target* target_;
 

@@ -60,7 +60,7 @@
 
 (define shadow-map-display-rtask
   (rtask-def-display-texture shadow-map-tex #:channel 'r))
-($ (cadr (assq 'target (cdr shadow-map-display-rtask))) : set-viewport
+($ (car (object-property shadow-map-display-rtask 'target)) : set-viewport
   (rect-from-size 200 200))
 
 (define shadow-map-clear-rtask
@@ -117,11 +117,13 @@
 
 (define main-rtask
   (make-instance queue-rtask '()
-    (append (car shadow-map-clear-rtask))
-    (append (car main-clear-rtask))
+    (set-prof-enabled #t)
+
+    (append shadow-map-clear-rtask)
+    (append main-clear-rtask)
     (append* shadow-map-rtasks)
     (append* screen-rtasks)
-    (append (car shadow-map-display-rtask))))
+    (append shadow-map-display-rtask)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; utility functions

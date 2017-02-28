@@ -34,10 +34,13 @@ namespace shrtool {
  * render_target is not only a frame buffer, it saves all states that is need
  * to be set before a pass of render, like viewport and clear color, which are
  * mostly global states in OpenGL. And yes, those operations will mostly be done
- * in shader::draw.
+ * in shader::draw. more over, it may contain more than one frame buffers, if
+ * you are to render to a cubemap, while your driver does not support layered
+ * rendering.
  */
 
 class render_target : public lazy_id_object_<render_target> {
+    friend class shader;
 public:
     enum buffer_attachment {
         COLOR_BUFFER,
@@ -60,7 +63,7 @@ public:
 protected:
     rect viewport_;
     std::map<buffer_attachment, render_assets::texture*> tex_attachments_;
-    friend class shader;
+    std::vector<id_type> sub_targets_;
 
 public:
 
@@ -75,7 +78,8 @@ public:
 
     void attach_texture(buffer_attachment ba, render_assets::texture& tex);
 
-    void apply_viewport() const;
+    void apply_properties() const;
+    void clear_buffer(buffer_attachment ba) const;
 
     virtual void set_viewport(const rect& r) { viewport_ = r; }
     virtual const rect& get_viewport() const { return viewport_; }
@@ -86,8 +90,6 @@ public:
             return i->second;
         return nullptr;
     }
-
-    void clear_buffer(buffer_attachment ba) const;
 
     id_type create_object() const;
     void destroy_object(id_type i) const;
@@ -102,6 +104,14 @@ public:
 
     bool is_screen() const {
         return tex_attachments_.empty() && vacuum();
+    }
+
+    bool has_multiple_pass() const {
+        return get_pass_count() > 1;
+    }
+
+    size_t get_pass_count() const {
+        return 1 + sub_targets_.size();
     }
 
     static void meta_reg_() {
@@ -302,6 +312,17 @@ struct camera : render_target {
             transformation().get_inverse_mat();
     }
 
+    std::vector<math::mat4> get_cubemap_view_mat() const {
+        std::vector<math::mat4> ms(6);
+        ms[0] = math::tf::rotate(M_PI, math::tf::yOz) * get_view_mat();
+        ms[5] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[0];
+        ms[1] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[5];
+        ms[4] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[1];
+        ms[2] = math::tf::rotate(-M_PI / 2, math::tf::yOz) * ms[4];
+        ms[3] = math::tf::rotate( M_PI / 2, math::tf::yOz) * ms[4];
+        return std::move(ms);
+    }
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<camera>("camera")
             .enable_construct<>()
@@ -347,7 +368,10 @@ struct prop_trait<camera> {
     typedef shrtool::indirect_tag transfer_tag;
 
     static size_t size(const input_type& i) {
-        return sizeof(float) * 16 * 3;
+        if(!i.has_multiple_pass())
+            return sizeof(float) * 16 * 3;
+        else
+            return sizeof(float) * 16 * i.get_pass_count();
     }
 
     static bool is_changed(const input_type& i) {
@@ -359,19 +383,31 @@ struct prop_trait<camera> {
     }
 
     static void copy(const input_type& i, value_type* o) {
-        value_type* o_1 = o + 16;
-        value_type* o_2 = o + 32;
-        const math::mat4&
-            v = i.get_view_mat(),
-            vi = i.get_view_mat_inv(),
-            vp = i.calc_vp_mat();
+        if(!i.has_multiple_pass()) {
+            value_type* o_1 = o + 16;
+            value_type* o_2 = o + 32;
+            const math::mat4&
+                v = i.get_view_mat(),
+                vi = i.get_view_mat_inv(),
+                vp = i.calc_vp_mat();
 
-        for(size_t c = 0; c < 4; c++)
-            for(size_t r = 0; r < 4; r++) {
-                *(o++) = v.at(r, c);
-                *(o_1++) = vi.at(r, c);
-                *(o_2++) = vp.at(r, c);
+            for(size_t c = 0; c < 4; c++)
+                for(size_t r = 0; r < 4; r++) {
+                    *(o++) = v.at(r, c);
+                    *(o_1++) = vi.at(r, c);
+                    *(o_2++) = vp.at(r, c);
+                }
+        } else {
+            auto mats = i.get_cubemap_view_mat();
+            auto pm = i.calc_projection_mat();
+            for(math::mat4& m : mats) {
+                m = pm * m;
+                for(size_t c = 0; c < 4; c++)
+                    for(size_t r = 0; r < 4; r++) {
+                        *(o++) = m.at(r, c);
+                    }
             }
+        }
     }
 };
 

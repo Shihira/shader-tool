@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include "exception.h"
 #include "shading.h"
@@ -100,41 +101,88 @@ void render_target::attach_texture(
                 "texture to the screen.");
     tex_attachments_[ba] = &tex;
 
-    glBindFramebuffer(GL_FRAMEBUFFER, id());
-    tex.attach_to(em_buffer_attachment_(ba));
-    if(ba != DEPTH_BUFFER)
-        glDrawBuffer(em_buffer_attachment_(ba));
+    auto att = em_buffer_attachment_(ba);
+
+    if((tex.get_trait() & texture::CUBEMAP) == 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, id());
+        tex.attach_to(att);
+        if(ba != DEPTH_BUFFER)
+            glDrawBuffer(att);
+        glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+    } else {
+        glBindFramebuffer(GL_FRAMEBUFFER, id());
+        tex.attach_to((att << 3) + 0);
+        if(ba != DEPTH_BUFFER)
+            glDrawBuffer(att);
+        glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+
+        if(sub_targets_.size() > 5) {
+            glDeleteFramebuffers(sub_targets_.size() - 5,
+                    &sub_targets_[5]);
+            sub_targets_.resize(5);
+        } else if(sub_targets_.size() < 5) {
+            size_t org_size = sub_targets_.size();
+            sub_targets_.resize(5);
+            glGenFramebuffers(5 - org_size, &sub_targets_[org_size]);
+        }
+
+        for(size_t i = 1; i < 6; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, sub_targets_[i - 1]);
+            tex.attach_to((att << 3) + i);
+            glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+        }
+    }
 
     set_viewport(rect::from_size(tex.get_width(), tex.get_height()));
-
-    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
-void render_target::apply_viewport() const
+void render_target::apply_properties() const
 {
     const auto& vp = get_viewport();
     glViewport(vp.tl[0], vp.tl[1],
             vp.width(), vp.height());
+
+    if(get_depth_test())
+        glEnable(GL_DEPTH_TEST);
+    else
+        glDisable(GL_DEPTH_TEST);
+
+    switch(get_draw_face()) {
+        case NO_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
+        case FRONT_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_BACK); break;
+        case BACK_FACE:
+            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT); break;
+        case BOTH_FACE:
+            glDisable(GL_CULL_FACE); break;
+    }
+
+    switch(get_blend_func()) {
+        case OVERRIDE_BLEND:
+            glDisable(GL_BLEND);
+            break;
+        case ALPHA_BLEND:
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            break;
+        case PLUS_BLEND:
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
+            break;
+    }
+
 }
 
 void render_target::clear_buffer(render_target::buffer_attachment ba) const {
     glBindFramebuffer(GL_FRAMEBUFFER, id());
 
-    auto tbi = tex_attachments_.find(ba);
-    int clear_pass = 1;
-    if(tbi != tex_attachments_.end() &&
-            tbi->second->get_trait() & texture::CUBEMAP) {
-        clear_pass = 6;
-    }
+    const auto& vp = get_viewport();
+    glViewport(vp.tl[0], vp.tl[1],
+            vp.width(), vp.height());
 
-    apply_viewport();
-
-    for(int i = 0; i < clear_pass; i++) {
-
-        if(clear_pass == 6)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, em_buffer_attachment_(ba),
-                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tbi->second->id(), 0);
-
+    for(int i = 0; i < sub_targets_.size() + 1; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, i == 0 ? id() : sub_targets_[i-1]);
         if(ba == COLOR_BUFFER) {
             fcolor c = bgcolor_;
             glClearColor(c.r(), c.g(), c.b(), c.a());
@@ -144,9 +192,8 @@ void render_target::clear_buffer(render_target::buffer_attachment ba) const {
             glClearDepth(infdepth_);
             glClear(GL_DEPTH_BUFFER_BIT);
         }
+        glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
     }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 }
 
 sub_shader& shader::add_sub_shader(shader::shader_type t) {
@@ -214,39 +261,8 @@ void shader::property(size_t binding,
 void shader::draw(const vertex_attr_vector& vat) const {
     glUseProgram(id());
     glBindVertexArray(vat.id());
-    glBindFramebuffer(GL_FRAMEBUFFER, target_->id());
 
-    if(target_->get_depth_test())
-        glEnable(GL_DEPTH_TEST);
-    else
-        glDisable(GL_DEPTH_TEST);
-
-    switch(target_->get_draw_face()) {
-        case render_target::NO_FACE:
-            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
-        case render_target::FRONT_FACE:
-            glEnable(GL_CULL_FACE); glCullFace(GL_BACK); break;
-        case render_target::BACK_FACE:
-            glEnable(GL_CULL_FACE); glCullFace(GL_FRONT); break;
-        case render_target::BOTH_FACE:
-            glDisable(GL_CULL_FACE); break;
-    }
-
-    switch(target_->get_blend_func()) {
-        case render_target::OVERRIDE_BLEND:
-            glDisable(GL_BLEND);
-            break;
-        case render_target::ALPHA_BLEND:
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            break;
-        case render_target::PLUS_BLEND:
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_ONE, GL_ONE);
-            break;
-    }
-
-    target_->apply_viewport();
+    target_->apply_properties();
 
     // bind textures
     size_t tex_num = 0;
@@ -256,25 +272,20 @@ void shader::draw(const vertex_attr_vector& vat) const {
         tex_num += 1;
     }
 
-    int render_passes = 1;
-    auto tbi = target_->tex_attachments_.find(render_target::COLOR_BUFFER_0);
-    if(tbi != target_->tex_attachments_.end() &&
-            tbi->second->get_trait() & texture::CUBEMAP) {
-        render_passes = 6;
-    }
-
-    for(int rp = 0; rp < render_passes; rp++) {
-        if(render_passes == 6) {
-            glBindTexture(GL_TEXTURE_CUBE_MAP, tbi->second->id());
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                GL_TEXTURE_CUBE_MAP_POSITIVE_X + rp, tbi->second->id(), 0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
-            glUniform1i(glGetUniformLocation(id(), "cubemapPass_"), rp);
-        }
+    if(!target_->has_multiple_pass()) {
+        glBindFramebuffer(GL_FRAMEBUFFER, target_->id());
         glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+        glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
+    } else {
+        for(int i = 0; i < target_->sub_targets_.size() + 1; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER,
+                i == 0 ? target_->id() : target_->sub_targets_[i-1]);
+            glUniform1i(glGetUniformLocation(id(), "renderPass_"), i);
+            glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(GL_NONE);
     glUseProgram(GL_NONE);
 

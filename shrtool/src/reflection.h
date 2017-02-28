@@ -123,7 +123,6 @@ struct auto_register_ {
     typedef auto_register_func_guard_<> ar;
 
     auto_register_() {
-
         if(ar::used >= ar::max_size) throw restriction_error(
                 "Meta registeration has reached its capacity");
 

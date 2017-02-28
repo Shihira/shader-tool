@@ -85,7 +85,7 @@ TEST_CASE_FIXTURE(test_scm_array, scm_obj_fixture) {
     scm_c_eval_string("(define propset (make-propset))");
     scm_c_eval_string("(propset-append propset 2)");
     scm_c_eval_string("(propset-append propset 3.2)");
-    scm_c_eval_string("(propset-append propset (mat-zeros 3 3))");
+    scm_c_eval_string("(propset-append propset (mat-eye 3))");
     scm_c_eval_string("(display (propset-definition propset"
             " \"propset\") strport)");
     scm_newline(strport);

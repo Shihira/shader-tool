@@ -1,15 +1,14 @@
 (define-public rtask-def-clear
   (lambda (rt bufs)
-    (cons
-      (make-instance proc-rtask
-        (list (lambda ()
-                (letrec ((iter (lambda (x)
-                                 (if (pair? x)
-                                   (begin
-                                     ($ rt : clear-buffer (car x))
-                                     (iter (cdr x)))
-                                   #nil))))
-                  (iter bufs))))) '())))
+    (make-instance proc-rtask
+      (list (lambda ()
+              (letrec ((iter (lambda (x)
+                               (if (pair? x)
+                                 (begin
+                                   ($ rt : clear-buffer (car x))
+                                   (iter (cdr x)))
+                                 #nil))))
+                (iter bufs)))))))
 
 (define display-texture-config
   (lambda (procColor procCoord)
@@ -21,7 +20,6 @@
        (tex2d . "texMap")))
     (sub-shader
       (type . fragment)
-      (version . "330 core")
       (source . ,(string-append "
         in vec2 texCoord;
         out vec4 outColor;
@@ -32,7 +30,6 @@
         }")))
     (sub-shader
       (type . vertex)
-      (version . "330 core")
       (source . ,(string-append "
         out vec2 texCoord;
         vec2 procCoord(float x, float y) {" procCoord "}
@@ -40,7 +37,6 @@
             gl_Position = vec4(position.z, position.x, 0, 1);
             texCoord = procCoord(position.z, position.x) / 2 + vec2(0.5, 0.5);
         }"))))))
-
 
 (define-public rtask-def-display-texture
   (lambda* (tex #:key (upside-down #f) (channel 'rgba))
@@ -66,8 +62,9 @@
       (if (string=? (instance-get-type tex #t) "image")
          ($ rtask : set-texture2d-image "texMap" tex)
          ($ rtask : set-texture "texMap" tex))
-      (cons rtask
+      (set-object-properties! rtask
         `((mesh ,mesh)
           (shader ,shader)
-          (target ,cam))))))
+          (target ,cam)))
+      rtask)))
 

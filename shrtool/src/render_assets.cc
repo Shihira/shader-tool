@@ -330,7 +330,13 @@ void texture_cubemap::read(void* data, texture::format fmt)
 
 void texture_cubemap::attach_to(size_t tex_attachment)
 {
-    /* do nothing, thing are done in shading step */
+    size_t att = tex_attachment >> 3;
+    size_t lyr = tex_attachment % 8;
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, id());
+    glFramebufferTexture2D(GL_FRAMEBUFFER, att,
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X + lyr, id(), 0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, GL_NONE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

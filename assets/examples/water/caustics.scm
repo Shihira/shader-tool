@@ -11,7 +11,6 @@
        (tex2d . "hfMap")))
    (sub-shader
      (type . vertex)
-     (version . "330 core")
      (source . "
        const float nAir = 1.000028, nWater = 1.333333;
 
@@ -67,7 +66,6 @@
        }"))
    (sub-shader
      (type . geometry)
-     (version . "330 core")
      (source . "
        layout(triangles) in;
        layout(triangle_strip, max_vertices = 3) out;
@@ -98,7 +96,6 @@
        }"))
    (sub-shader
      (type . fragment)
-     (version . "330 core")
      (source . "
        layout(location = 0) out vec4 color;
 

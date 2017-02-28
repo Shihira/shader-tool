@@ -12,7 +12,6 @@
       (tex2d . "hfMap")))
   (sub-shader
     (type . fragment)
-    (version . "330 core")
     (source . "
       out vec4 outInfo;
 
@@ -53,7 +52,6 @@
       }"))
   (sub-shader
     (type . vertex)
-    (version . "330 core")
     (source . "
       out vec2 texCoord;
       void main() {

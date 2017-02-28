@@ -1,5 +1,6 @@
 #include <vector>
 #include <iostream>
+#include <chrono>
 
 #include "render_queue.h"
 
@@ -75,8 +76,58 @@ void shader_render_task::render() const {
 }
 
 void queue_render_task::render() const {
-    for(const render_task* t : tasks)
+
+    for(const render_task* t : tasks) {
+        auto beg = std::chrono::system_clock::now();
         t->render();
+        auto dur = std::chrono::system_clock::now() - beg;
+
+        if(prof_enabled_) {
+            auto i = prof_.find(t);
+            if(i == prof_.end()) {
+                prof_[t] = std::chrono::duration_cast<
+                    std::chrono::microseconds>(dur).count();
+            } else {
+               i->second = i->second * 20 + std::chrono::duration_cast<
+                   std::chrono::microseconds>(dur).count();
+               i->second /= 21;
+            }
+        }
+    }
+}
+
+void queue_render_task::print_profile_log() const
+{
+    int idx = 0;
+
+    for(const render_task* t : tasks) {
+        auto& log = info_log << "Profiling info: " << t <<
+            " (index " << idx << ") ";
+        auto i = prof_.find(t);
+        if(i == prof_.end())
+            log << "has no record." << std::endl;
+        else
+            log << float(i->second / 1000) << " ms." << std::endl;
+
+        idx += 1;
+    }
+}
+
+void provided_render_task::update() const
+{
+    if(shader_updater) shader_updater();
+    if(target_updater) target_updater();
+    if(attr_updater) attr_updater();
+
+    for(auto& pu : prop_updater) {
+        if(pu.second) pu.second();
+    }
+}
+
+void provided_render_task::render() const
+{
+    update();
+    shader_render_task::render();
 }
 
 }

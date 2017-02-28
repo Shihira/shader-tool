@@ -88,6 +88,8 @@ public:
  */
 
 class queue_render_task : public render_task {
+    mutable std::map<const render_task*, double> prof_;
+
 public:
     std::list<const render_task*> tasks;
 
@@ -109,11 +111,18 @@ public:
     size_t size() const { return tasks.size(); }
     void clear() { tasks.clear(); }
 
+    PROPERTY_RW(bool, prof_enabled)
+
+    void print_profile_log() const;
+
     static void meta_reg_() {
         refl::meta_manager::reg_class<queue_render_task>("queue_rtask")
             .enable_construct<>()
             .enable_base<render_task>()
             .enable_auto_register()
+            .function("set_prof_enabled", &queue_render_task::set_prof_enabled)
+            .function("get_prof_enabled", &queue_render_task::get_prof_enabled)
+            .function("print_profile_log", &queue_render_task::print_profile_log)
             .function("sort", &queue_render_task::sort)
             .function("append", &queue_render_task::append)
             .function("size", &queue_render_task::size)
@@ -283,19 +292,8 @@ public:
         shader_render_task::set_texture_property(name, tex);
     }
 
-    void update() const {
-        if(shader_updater) shader_updater();
-        if(target_updater) target_updater();
-        if(attr_updater) attr_updater();
-
-        for(auto& pu : prop_updater)
-            if(pu.second) pu.second();
-    }
-
-    void render() const override {
-        update();
-        shader_render_task::render();
-    }
+    void update() const;
+    void render() const override;
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<provided_render_task>("shading_rtask")

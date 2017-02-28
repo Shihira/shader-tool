@@ -53,6 +53,6 @@
 
 (define main-rtask
   (make-instance queue-rtask '()
-    (append (car clear-rtask))
+    (append clear-rtask)
     (append render-rtask)))
 

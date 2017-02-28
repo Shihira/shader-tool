@@ -7,6 +7,7 @@
 #include <readline/history.h>
 
 #include <functional>
+#include <chrono>
 #include <map>
 
 #include "scm.h"
@@ -21,6 +22,7 @@ using namespace shrtool;
 
 class display_window {
     GLFWwindow* window = nullptr;
+    std::string title;
 
     static std::map<GLFWwindow*, display_window*> map_;
 
@@ -52,8 +54,9 @@ public:
     std::function<void(int, int)> keyrelease;
 
     display_window(const std::string ver_str = "330 core",
-            std::string title = "Shader Tool",
+            std::string ttl = "Shader Tool",
             size_t w = 800, size_t h = 600) :
+        title(ttl),
         update(do_nothing_v),
         draw(do_nothing_v),
         keypress(do_nothing_ii),
@@ -94,11 +97,21 @@ public:
     }
 
     void main_loop() {
+        double lastTime = glfwGetTime();
+        size_t frames = 0;
         while(!glfwWindowShouldClose(window) && !should_close) {
+            frames += 1;
             update();
             draw();
             glfwSwapBuffers(window);
             glfwPollEvents();
+
+            if(glfwGetTime() - lastTime > 1.0) {
+                glfwSetWindowTitle(window, (title + "  FPS: " +
+                        std::to_string(frames)).c_str());
+                lastTime = glfwGetTime();
+                frames = 0;
+            }
         }
     }
 
@@ -200,9 +213,9 @@ int main(int argc, char* argv[])
     };
 
     dw.draw = [&]() {
-        if(main_rtask)
+        if(main_rtask) {
             main_rtask->render();
-        else
+        } else
             render_target::screen.clear_buffer(render_target::COLOR_BUFFER);
     };
 

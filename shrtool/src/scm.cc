@@ -509,8 +509,16 @@ void parse_shader_from_scm(scm_t shader_list_, shader_info& s)
         }
         else if(is_symbol_eq(symbol, "sub-shader")) {
             sub_shader_info ssi;
-            ssi.version = scm_to_latin1_string(map_idx(alist, "version"));
-            ssi.source = scm_to_latin1_string(map_idx(alist, "source"));
+            SCM ver = map_idx(alist, "version");
+            SCM src = map_idx(alist, "source");
+
+            if(!scm_is_false(ver))
+                ssi.version = scm_to_latin1_string(ver);
+            else ssi.version = "330 core";
+
+            if(!scm_is_false(src))
+                ssi.source = scm_to_latin1_string(src);
+            else throw unsupported_error("No source provided in sub-shader.");
 
             const char* type = scm_to_latin1_string(
                     scm_symbol_to_string(map_idx(alist, "type")));

@@ -19,7 +19,6 @@
       (tex2d . "hfMap")))
   (sub-shader
     (type . fragment)
-    (version . "330 core")
     (source . "
       in vec4 fragPosition;
       in vec3 fragNormal;
@@ -80,7 +79,6 @@
       }"))
   (sub-shader
     (type . vertex)
-    (version . "330 core")
     (source . "
       out vec4 fragPosition;
       out vec3 fragNormal;

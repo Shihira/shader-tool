@@ -23,12 +23,14 @@
 
 (define hf-cam
   (make-instance camera '()
+    (attach-texture 'color-buffer-0 (cadr hf-texs))
     (set-depth-test #f)))
 
 (define hf-rtask
   (make-instance shading-rtask '()
     (set-target hf-cam)
     (set-shader hf-shader)
+    (set-texture "hfMap" (car hf-texs))
     (set-attributes standard-panel)))
 
 (define pre-hf-rtask
@@ -94,7 +96,7 @@
 
 (define screen-cam
   (make-instance camera '()
-    (set-bgcolor #xff111111)
+    (set-bgcolor #xff222222)
     (set-depth-test #t)
     (set-visible-angle (/ pi 8.4))
     (set-draw-face 'back-face)
@@ -148,7 +150,6 @@
 (define pre-water-surf-rtask
   (make-instance proc-rtask
     `(,(lambda ()
-         ($ screen-cam : set-blend-func 'override-blend)
          ($ water-surf-rtask : set-texture "hfMap" (cadr hf-texs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -206,7 +207,7 @@
     (make-instance transfrm '()))
 
 (define wall-shader
-  (shader-from-config (load "pool-wall.scm")))
+  (shader-from-config ((load "pool-wall.scm") #f)))
 
 (define wall-rtask
    (make-instance shading-rtask '()
@@ -220,11 +221,6 @@
      (set-property-camera "camera" screen-cam)
      (set-property-camera "causticsCamera" caustics-cam)))
 
-(define pre-wall-rtask
-  (make-instance proc-rtask
-    (list (lambda ()
-            ($ screen-cam : set-blend-func 'override-blend)))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; render to cubemap
 
@@ -235,42 +231,14 @@
 (define env-map-cam
   (make-instance camera '()
     (set-draw-face 'both-face)
-    (set-bgcolor #xff00ffff)
+    (set-bgcolor #xff000000)
     (set-near-clip-plane 0.1)
     (set-far-clip-plane 10)
     (attach-texture 'color-buffer-0 env-map-cubemap)
     (attach-texture 'depth-buffer env-map-cubemap-depth-buffer)))
 
-(define env-map-sky
-  (mesh-gen-box 2 2 2))
-(define env-map-sky-transfrm
-  (make-instance transfrm '()
-    (translate 0 0.5 0)))
-
-(define env-map-multi-camera-propset
-  (let* ((pmat (mat-cast 'f32 ($ env-map-cam : calc-projection-mat)))
-         (hor-mat (mat-rotate-4 (/ pi -2) 'zOx))
-         (up-mat (mat-rotate-4 (/ pi -2) 'yOz))
-         (down-mat (mat-rotate-4 (/ pi 2) 'yOz))
-
-         (neg-z-vmat (mat-rotate-4 pi 'xOy))
-         (neg-x-vmat (mat* hor-mat neg-z-vmat))
-         (pos-z-vmat (mat* hor-mat neg-x-vmat))
-         (pos-x-vmat (mat* hor-mat pos-z-vmat))
-
-         (pos-y-vmat (mat* up-mat pos-z-vmat))
-         (neg-y-vmat (mat* down-mat pos-z-vmat))
-         (vmats (list pos-x-vmat neg-x-vmat
-                      pos-y-vmat neg-y-vmat
-                      pos-z-vmat neg-z-vmat))
-         (ps (make-instance propset '()))
-         (_ (map (lambda (vmat)
-                   ($ ps : append (mat* pmat vmat)))
-              vmats)))
-    ps))
-
 (define env-map-shader
-  (shader-from-config (load "environ-map.scm")))
+  (shader-from-config ((load "pool-wall.scm") #t)))
 
 (define env-map-clear-rtask
   (rtask-def-clear env-map-cam '(color-buffer depth-buffer)))
@@ -280,12 +248,11 @@
     (set-target env-map-cam)
     (set-attributes wall-mesh)
     (set-shader env-map-shader)
-    (set-property "multiCamera" env-map-multi-camera-propset)
+    (set-property-camera "camera" env-map-cam)
     (set-property "material" wall-propset-material)
     (set-property "illum" water-surf-propset-illum)
     (set-texture "causticsMap" caustics-tex)
     (set-property-transfrm "transfrm" wall-transfrm)
-    (set-property-camera "camera" screen-cam)
     (set-property-camera "causticsCamera" caustics-cam)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -293,7 +260,7 @@
 (define display-cubemap-camera-transfrm
   (make-instance transfrm '()
     (translate 0 0 2)
-    (rotate (/ pi 6) 'yOz)
+    (rotate (/ pi -6) 'yOz)
     (rotate (/ pi 6) 'zOx)))
 
 (define display-cubemap-transfrm
@@ -320,7 +287,7 @@
 
 (define display-cubemap-rotate
   (lambda ()
-    ($- ($ display-cubemap-camera : transformation) : rotate (/ pi -120) 'yOx)))
+    ($- ($ display-cubemap-camera : transformation) : rotate (/ pi -120) 'zOx)))
 
 (define display-cubemap-shader
   (built-in-shader "lambertian-cubemap"))
@@ -344,24 +311,24 @@
 
 (define main-rtask
   (make-instance queue-rtask '()
-    (append (car screen-clear-rtask))
+    (set-prof-enabled #t)
+    (append screen-clear-rtask)
 
     (append pre-hf-rtask)
     (append hf-rtask)
    ;(append pre-hf-texdisp-rtask)
-   ;(append (car hf-texdisp-rtask))))
+   ;(append hf-texdisp-rtask)))
 
     (append pre-caustics-rtask)
-    (append (car caustics-clear-rtask))
+    (append caustics-clear-rtask)
     (append caustics-rtask)
-   ;(append (car caustics-display-rtask))))
+   ;(append caustics-display-rtask)))
 
-    (append (car env-map-clear-rtask))
+    (append env-map-clear-rtask)
     (append env-map-rtask)
-   ;(append (car display-cubemap-clear-rtask))
+   ;(append display-cubemap-clear-rtask)
    ;(append display-cubemap-rtask)))
 
-    (append pre-wall-rtask)
     (append wall-rtask)
     (append pre-water-surf-rtask)
     (append water-surf-rtask)))

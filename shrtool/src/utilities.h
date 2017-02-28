@@ -350,30 +350,35 @@ struct transfrm {
         pos[1] = -pos[1];
         pos[2] = -pos[2];
         inv_mat_ = inv_mat_ * math::tf::translate(pos);
+        changed_ = true;
         return *this;
     }
 
     transfrm& translate(const math::col3& pos) {
         mat_ = math::tf::translate(pos) * mat_;
         inv_mat_ = inv_mat_ * math::tf::translate(-pos);
+        changed_ = true;
         return *this;
     }
 
     transfrm& rotate(double a, math::tf::plane p) {
         mat_ = math::tf::rotate(a, p) * mat_;
         inv_mat_ = inv_mat_ * math::tf::rotate(-a, p);
+        changed_ = true;
         return *this;
     }
 
     transfrm& scale(double x, double y, double z) {
         mat_ = math::tf::scale(x, y, z) * mat_;
         inv_mat_ = inv_mat_ * math::tf::scale(1/x, 1/y, 1/z);
+        changed_ = true;
         return *this;
     }
 
     void set_mat(const math::mat4& m) {
         mat_ = m;
         inv_mat_ = math::inverse(mat_);
+        changed_ = true;
     }
 
     bool operator==(const transfrm& a) const {
@@ -384,7 +389,7 @@ struct transfrm {
     const math::mat4& get_inverse_mat() const { return inv_mat_; }
 
     bool is_changed() const { return changed_; }
-    void mark_applied() { changed_ = true; }
+    void mark_applied() { changed_ = false; }
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<transfrm>("transfrm")

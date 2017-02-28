@@ -150,6 +150,10 @@ public:
 
     virtual void read(void* data, format fmt = DEFAULT_FMT);
 
+    // the parameters of these functions have no direct relationship with the
+    // binding point or the attachment point in display driver concept. the
+    // value and the meaning of them is dicided by the application, or rather,
+    // the render target.
     virtual void bind_to(int tex_bind) const;
     virtual void attach_to(size_t tex_attachment);
 

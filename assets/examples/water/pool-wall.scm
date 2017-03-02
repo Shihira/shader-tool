@@ -42,6 +42,7 @@
           {
               worldPos = mMatrix * position;
               worldPos /= worldPos.w;
+              worldPos.y = min(worldPos.y, 0);
 
               fragNormal = (transpose(mMatrix_inv) * vec4(normal, 0)).xyz;
               fragNormal = normalize(fragNormal);
@@ -67,9 +68,6 @@
 
           void main()
           {
-              if(worldPos.y > 0)
-                  discard;
-
               vec4 causPos = caus_vpMatrix * worldPos;
               causPos /= causPos.w;
               vec2 texCoord = causPos.xy * 0.5 + vec2(0.5, 0.5);

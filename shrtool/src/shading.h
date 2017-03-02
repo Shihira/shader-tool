@@ -70,10 +70,11 @@ public:
     PROPERTY_RW(color, bgcolor)
     PROPERTY_RW(float, infdepth)
     PROPERTY_RW(bool, depth_test)
+    PROPERTY_RW(bool, wire_frame)
     PROPERTY_RW(draw_face_name, draw_face)
     PROPERTY_RW(blend_func_name, blend_func)
 
-    render_target() : infdepth_(1), depth_test_(false),
+    render_target() : infdepth_(1), depth_test_(false), wire_frame_(false),
         draw_face_(BOTH_FACE), blend_func_(OVERRIDE_BLEND) { }
 
     void attach_texture(buffer_attachment ba, render_assets::texture& tex);
@@ -127,6 +128,8 @@ public:
             .function("get_bgcolor", &render_target::get_bgcolor)
             .function("set_depth_test", &render_target::set_depth_test)
             .function("get_depth_test", &render_target::get_depth_test)
+            .function("set_wire_frame", &render_target::set_wire_frame)
+            .function("get_wire_frame", &render_target::get_wire_frame)
             .function("set_draw_face", &render_target::set_draw_face)
             .function("get_draw_face", &render_target::get_draw_face)
             .function("set_blend_func", &render_target::set_blend_func)
@@ -312,16 +315,7 @@ struct camera : render_target {
             transformation().get_inverse_mat();
     }
 
-    std::vector<math::mat4> get_cubemap_view_mat() const {
-        std::vector<math::mat4> ms(6);
-        ms[0] = math::tf::rotate(M_PI, math::tf::yOz) * get_view_mat();
-        ms[5] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[0];
-        ms[1] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[5];
-        ms[4] = math::tf::rotate(-M_PI / 2, math::tf::zOx) * ms[1];
-        ms[2] = math::tf::rotate(-M_PI / 2, math::tf::yOz) * ms[4];
-        ms[3] = math::tf::rotate( M_PI / 2, math::tf::yOz) * ms[4];
-        return std::move(ms);
-    }
+    std::vector<math::mat4> get_cubemap_view_mat() const;
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<camera>("camera")

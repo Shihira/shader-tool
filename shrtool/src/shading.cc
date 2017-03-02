@@ -147,6 +147,11 @@ void render_target::apply_properties() const
     else
         glDisable(GL_DEPTH_TEST);
 
+    if(get_wire_frame())
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    else
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
     switch(get_draw_face()) {
         case NO_FACE:
             glEnable(GL_CULL_FACE); glCullFace(GL_FRONT_AND_BACK); break;
@@ -181,6 +186,7 @@ void render_target::clear_buffer(render_target::buffer_attachment ba) const {
     glViewport(vp.tl[0], vp.tl[1],
             vp.width(), vp.height());
 
+    
     for(int i = 0; i < sub_targets_.size() + 1; i++) {
         glBindFramebuffer(GL_FRAMEBUFFER, i == 0 ? id() : sub_targets_[i-1]);
         if(ba == COLOR_BUFFER) {
@@ -351,6 +357,20 @@ void vertex_attr_vector::updated(size_t loc) {
                 primitives_count() / em_element_type_size_(buf->type()),
             em_element_type_(buf->type()), GL_TRUE, 0, 0);
     glBindVertexArray(GL_NONE);
+}
+
+std::vector<math::mat4> camera::get_cubemap_view_mat() const {
+    std::vector<math::mat4> ms(6);
+    constexpr int
+        pos_x = 0, pos_y = 2, pos_z = 4,
+        neg_x = 1, neg_y = 3, neg_z = 5;
+    ms[pos_z] = math::tf::rotate(M_PI, math::tf::yOz);
+    ms[pos_x] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[pos_z];
+    ms[neg_z] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[pos_x];
+    ms[neg_x] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[neg_z];
+    ms[pos_y] = math::tf::rotate(-M_PI/2, math::tf::yOz) * ms[pos_z];
+    ms[neg_y] = math::tf::rotate( M_PI/2, math::tf::yOz) * ms[pos_z];
+    return std::move(ms);
 }
 
 }

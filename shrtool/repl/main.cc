@@ -107,8 +107,7 @@ public:
             glfwPollEvents();
 
             if(glfwGetTime() - lastTime > 1.0) {
-                glfwSetWindowTitle(window, (title + "  FPS: " +
-                        std::to_string(frames)).c_str());
+                scm_c_define("fps", scm_from_int(frames));
                 lastTime = glfwGetTime();
                 frames = 0;
             }

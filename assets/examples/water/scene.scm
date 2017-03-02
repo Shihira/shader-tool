@@ -255,56 +255,8 @@
     (set-property-transfrm "transfrm" wall-transfrm)
     (set-property-camera "causticsCamera" caustics-cam)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define display-cubemap-camera-transfrm
-  (make-instance transfrm '()
-    (translate 0 0 2)
-    (rotate (/ pi -6) 'yOz)
-    (rotate (/ pi 6) 'zOx)))
-
-(define display-cubemap-transfrm
-  (make-instance transfrm '()))
-
-(define display-cubemap-mesh
-  (mesh-gen-box 1 1 1))
-
-(define display-cubemap-illum
-  (make-instance propset '()
-    (append (mat-cvec 0 0 0 0))
-    (append (make-color #xffffffff))))
-
-(define display-cubemap-material
-  (make-instance propset '()
-    (append-float 1)
-    (append-float 0)))
-
-(define display-cubemap-camera
-  (make-instance camera '()
-    (set-bgcolor #xff222222)
-    (set-transformation display-cubemap-camera-transfrm)
-    (set-depth-test #t)))
-
-(define display-cubemap-rotate
-  (lambda ()
-    ($- ($ display-cubemap-camera : transformation) : rotate (/ pi -120) 'zOx)))
-
-(define display-cubemap-shader
-  (built-in-shader "lambertian-cubemap"))
-
-(define display-cubemap-clear-rtask
-  (rtask-def-clear display-cubemap-camera '(color-buffer depth-buffer)))
-
 (define display-cubemap-rtask
-  (make-instance shading-rtask '()
-    (set-property-transfrm "transfrm" display-cubemap-transfrm)
-    (set-attributes display-cubemap-mesh)
-    (set-property "illum" display-cubemap-illum)
-    (set-property "material" display-cubemap-material)
-    (set-property-camera "camera" display-cubemap-camera)
-    (set-target display-cubemap-camera)
-    (set-shader display-cubemap-shader)
-    (set-texture "texMap" env-map-cubemap)))
+  (rtask-def-display-cubemap env-map-cubemap))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; main-rtask
@@ -326,7 +278,6 @@
 
     (append env-map-clear-rtask)
     (append env-map-rtask)
-   ;(append display-cubemap-clear-rtask)
    ;(append display-cubemap-rtask)))
 
     (append wall-rtask)

@@ -1,3 +1,6 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; clear
+
 (define-public rtask-def-clear
   (lambda (rt bufs)
     (make-instance proc-rtask
@@ -9,6 +12,9 @@
                                    (iter (cdr x)))
                                  #nil))))
                 (iter bufs)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; display texture
 
 (define display-texture-config
   (lambda (procColor procCoord)
@@ -67,4 +73,70 @@
           (shader ,shader)
           (target ,cam)))
       rtask)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; display cubemap
+
+(define display-cubemap-camera #nil)
+
+(define-public rtask-def-display-cubemap-rotate
+  (lambda* (#:optional (angle (/ pi -120)) (axis 'zOx))
+    (if (not (null? display-cubemap-camera))
+      ($- ($ display-cubemap-camera : transformation) : rotate angle axis)
+      #nil)))
+
+(define-public rtask-def-display-cubemap
+  (lambda (tex)
+    (let* ((shader 
+             (built-in-shader "lambertian-cubemap"))
+           (camera-transfrm
+             (make-instance transfrm '()
+               (translate 0 0 2)
+               (rotate (/ pi 6) 'yOz)
+               (rotate (/ pi 6) 'zOx)))
+            (transfrm
+              (make-instance transfrm '()))
+            (mesh
+              (mesh-gen-box 1 1 1))
+            (illum
+              (make-instance propset '()
+                (append (mat-cvec 0 0 0 0))
+                (append (make-color #xffffffff))))
+            (material
+              (make-instance propset '()
+                (append-float 1)
+                (append-float 0)))
+            (camera
+              (make-instance camera '()
+                (set-bgcolor #xff222222)
+                (set-transformation camera-transfrm)
+                (set-depth-test #t)))
+            (rtask
+              (make-instance shading-rtask '()
+                (set-property-transfrm "transfrm" transfrm)
+                (set-attributes mesh)
+                (set-property "illum" illum)
+                (set-property "material" material)
+                (set-property-camera "camera" camera)
+                (set-target camera)
+                (set-shader shader)
+                (set-texture "texMap" tex)))
+            (clr-rtask
+               (rtask-def-clear camera '(color-buffer depth-buffer)))
+            (q-rtask
+               (make-instance queue-rtask '()
+                 (append clr-rtask)
+                 (append rtask))))
+      (set-object-properties! q-rtask
+        `((shader . ,shader)
+          (transfrm . ,transfrm)
+          (mesh . ,mesh)
+          (illum . ,illum)
+          (material . ,material)
+          (camera . ,camera)
+          (rtask . ,rtask)
+          (clr-rtask . ,clr-rtask)))
+      (set! display-cubemap-camera camera)
+      q-rtask)))
+
 

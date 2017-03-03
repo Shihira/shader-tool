@@ -354,9 +354,6 @@ void register_all()
         std::string type_name = m.second.name();
 
         for(auto& f : m.second.function_set()) {
-            debug_log << "scm registered " << type_name
-                << "::" << f.first << std::endl;
-
             if(f.first.empty())
                 continue;
             if(f.first[0] == '_') {
@@ -364,6 +361,9 @@ void register_all()
                         f.first.substr(0, 6) == "__init" && !reged_cons) {
                     std::string func_name = "make-" + type_name;
                     for(char& c : func_name) c = c == '_' ? '-' : c;
+
+                    debug_log << "scm registered " << type_name
+                        << "::" << f.first << " -> " << func_name << std::endl;
 
                     scm_call_2(
                         scm_c_public_ref("shrtool", "shrtool-register-constructor"),
@@ -378,6 +378,9 @@ void register_all()
                 (type_name != "builtin" ? (type_name + "-") : "") + f.first;
             for(char& c : func_name)
                 c = c == '_' ? '-' : c;
+
+            debug_log << "scm registered " << type_name
+                << "::" << f.first << " -> " << func_name << std::endl;
 
             scm_call_3(
                 scm_c_public_ref("shrtool", "shrtool-register-function"),

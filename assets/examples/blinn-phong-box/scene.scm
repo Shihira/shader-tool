@@ -2,9 +2,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define main-model
-  (mesh-gen-uv-sphere 2 20 10 #t))
+; (mesh-gen-uv-sphere 2 20 10 #t))
 ; (mesh-gen-plane 1 1 1 1))
-; (mesh-gen-box 2 2 2))
+  (mesh-gen-box 2 2 2))
 ; (vector-ref (built-in-model "teapot") 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -25,9 +25,9 @@
     (append (mat-cvec  0 1 5 1))))
 
 (define transfrm-mesh
-  (make-instance transfrm '()))
-    ;(rotate (/ pi 6) 'zOx)
-    ;(rotate (/ pi -6) 'yOz)))
+  (make-instance transfrm '()
+    (rotate (/ pi 6) 'zOx)
+    (rotate (/ pi -6) 'yOz)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

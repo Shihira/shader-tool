@@ -1,7 +1,7 @@
 #define TEST_SUITE "test_matrix"
 
-#include "unit_test.h"
-#include "matrix.h"
+#include "common/unit_test.h"
+#include "common/matrix.h"
 
 /*
  * TIPS:

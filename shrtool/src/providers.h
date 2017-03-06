@@ -28,7 +28,7 @@
 #include <iostream>
 
 #include "shading.h"
-#include "traits.h"
+#include "common/traits.h"
 
 namespace shrtool {
 
@@ -209,7 +209,8 @@ struct provider<InputType, render_assets::texture2d> {
         if(anew) {
             p.set_width(Trait::width(i));
             p.set_height(Trait::height(i));
-            p.fill(Trait::data(i), Trait::format(i));
+            p.fill(Trait::data(i),
+                    render_assets::texture::format(Trait::format(i)));
         }
     }
 };
@@ -221,12 +222,14 @@ struct provider<InputType, render_assets::texture_cubemap> {
 
     DEF_LOAD_FUNC
 
+    // inherit texture2d_trait is enough, at present
     template<typename Trait = texture2d_trait<input_type>>
     static void update(input_type& i, output_type& p, bool anew) {
         if(anew) {
             p.set_width(Trait::width(i));
             p.set_height(Trait::height(i) / 6);
-            p.fill(Trait::data(i), Trait::format(i));
+            p.fill(Trait::data(i),
+                    render_assets::texture::format(Trait::format(i)));
         }
     }
 };

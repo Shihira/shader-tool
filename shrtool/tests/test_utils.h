@@ -6,9 +6,9 @@
 #include <cstdlib>
 #include <fstream>
 
-#include "unit_test.h"
-#include "singleton.h"
-#include "exception.h"
+#include "common/unit_test.h"
+#include "common/singleton.h"
+#include "common/exception.h"
 #include "shading.h"
 
 namespace shrtool {

@@ -4,8 +4,8 @@
 
 #include <iostream>
 
-#include "unit_test.h"
-#include "reflection.h"
+#include "common/unit_test.h"
+#include "common/reflection.h"
 
 using namespace shrtool;
 using namespace shrtool::refl;

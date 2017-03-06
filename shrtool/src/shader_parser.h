@@ -7,8 +7,8 @@
 
 #include "shading.h" 
 #include "providers.h"
-#include "reflection.h"
-#include "traits.h"
+#include "common/reflection.h"
+#include "common/traits.h"
 
 namespace shrtool {
 

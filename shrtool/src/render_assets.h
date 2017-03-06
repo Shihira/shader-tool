@@ -8,9 +8,9 @@
 #include <memory>
 #include <unordered_map>
 
-#include "reflection.h"
-#include "exception.h"
-#include "utilities.h"
+#include "common/reflection.h"
+#include "common/exception.h"
+#include "common/utilities.h"
 
 /*
  * NOTE: A render asset must not contain the reference of another.
@@ -79,12 +79,12 @@ public:
         NEAREST
     };
 
-    enum format {
+    enum format : size_t {
         // DEFAULT_FMT means that an unspecified format field will reference to
         // another specified field. If none is specified, it is equivalent to
         // RGBA_U8888.
         DEFAULT_FMT,
-        RGBA_U8888,
+        RGBA_U8888 = 128,
         R_F32,
         RG_F32,
         RGB_F32,

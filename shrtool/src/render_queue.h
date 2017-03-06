@@ -8,7 +8,7 @@
 
 #include "shading.h"
 #include "providers.h"
-#include "reflection.h"
+#include "common/reflection.h"
 
 namespace shrtool {
 
@@ -181,7 +181,7 @@ public:
 
 #include "shader_parser.h"
 #include "properties.h"
-#include "mesh.h"
+#include "common/mesh.h"
 
 namespace shrtool {
 

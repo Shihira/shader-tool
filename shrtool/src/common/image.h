@@ -7,7 +7,6 @@
 
 #include "traits.h"
 #include "reflection.h"
-#include "render_assets.h"
 #include "exception.h"
 
 namespace shrtool {
@@ -149,9 +148,8 @@ struct texture2d_trait<image> {
         return i.height();
     }
 
-    static shrtool::render_assets::texture2d::format
-    format(const input_type& i) {
-        return shrtool::render_assets::texture2d::RGBA_U8888;
+    static size_t format(const input_type& i) {
+        return RGBA_U8888;
     }
 
     static const void* data(const input_type& i) {

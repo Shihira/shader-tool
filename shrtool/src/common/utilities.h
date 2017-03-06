@@ -18,6 +18,14 @@ struct color;
 
 std::ostream& operator<<(std::ostream& os, const color& c);
 
+enum color_format : size_t {
+    RGBA_U8888 = 128,
+    R_F32,
+    RG_F32,
+    RGB_F32,
+    RGBA_F32,
+};
+
 struct color {
     union {
         struct {
@@ -121,6 +129,10 @@ struct color {
         refl::meta_manager::enable_cast<size_t, color>();
     }
 
+    static constexpr color_format format() {
+        return RGBA_U8888;
+    }
+
 private:
     static uint8_t clamp_uchar(int v) {
         return v < 0 ? 0 : v > 255 ? 255 : v;
@@ -200,6 +212,10 @@ struct fcolor {
             .function("b", &color::b)
             .function("a", &color::a)
             .function("rgba", &color::rgba);
+    }
+
+    static constexpr color_format format() {
+        return RGBA_F32;
     }
 };
 

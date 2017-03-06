@@ -1,7 +1,7 @@
 #define EXPOSE_EXCEPTION
 
-#include "unit_test.h"
-#include "mesh.h"
+#include "common/unit_test.h"
+#include "common/mesh.h"
 
 using namespace std;
 using namespace shrtool;

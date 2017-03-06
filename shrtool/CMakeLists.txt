@@ -3,7 +3,7 @@ find_package(GLEW REQUIRED)
 find_package(GLFW REQUIRED)
 find_package(Guile REQUIRED)
 
-file(GLOB_RECURSE ALL_SOURCE src/*.cc) 
+file(GLOB_RECURSE ALL_SOURCE src/*.cc src/common/*.cc) 
 
 add_library(${PROJECT_NAME} SHARED ${ALL_SOURCE})
 include_directories(${PROJECT_NAME}

@@ -2,12 +2,13 @@
 #include <fstream>
 
 #define EXPOSE_EXCEPTION
+
 #include "test_utils.h"
 #include "providers.h"
-#include "mesh.h"
+#include "common/mesh.h"
 #include "shader_parser.h"
 #include "properties.h"
-#include "image.h"
+#include "common/image.h"
 
 using namespace shrtool;
 using namespace shrtool::math;

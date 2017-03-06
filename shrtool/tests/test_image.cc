@@ -1,5 +1,5 @@
-#include "unit_test.h"
-#include "image.h"
+#include "common/unit_test.h"
+#include "common/image.h"
 
 using namespace std;
 using namespace shrtool;

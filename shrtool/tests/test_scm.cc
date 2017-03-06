@@ -6,7 +6,7 @@
 #include <sstream>
 #include <fstream>
 
-#include "unit_test.h"
+#include "common/unit_test.h"
 #include "test_utils.h"
 #include "scm.h"
 

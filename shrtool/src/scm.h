@@ -4,7 +4,7 @@
 #include <guile/2.0/libguile.h>
 
 #include "shader_parser.h"
-#include "reflection.h"
+#include "common/reflection.h"
 
 namespace shrtool {
 

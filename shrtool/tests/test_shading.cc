@@ -1,6 +1,6 @@
 #define EXPOSE_EXCEPTION
 #include "test_utils.h"
-#include "matrix.h"
+#include "common/matrix.h"
 
 using namespace shrtool;
 using namespace shrtool::math;

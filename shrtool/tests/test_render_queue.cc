@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "unit_test.h"
+#include "common/unit_test.h"
 #include "render_queue.h"
 
 using namespace std;
@@ -101,11 +101,11 @@ TEST_CASE(test_topology_sort_failure) {
 #include <libguile.h>
 
 #include "test_utils.h"
-#include "image.h"
+#include "common/image.h"
 #include "shader_parser.h"
-#include "mesh.h"
+#include "common/mesh.h"
 #include "properties.h"
-#include "matrix.h"
+#include "common/matrix.h"
 
 using namespace shrtool::render_assets;
 using namespace shrtool::math;

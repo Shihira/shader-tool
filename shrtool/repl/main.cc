@@ -11,7 +11,7 @@
 #include <map>
 
 #include "scm.h"
-#include "exception.h"
+#include "common/exception.h"
 #include "shading.h"
 #include "render_queue.h"
 

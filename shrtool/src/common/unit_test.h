@@ -220,7 +220,7 @@ inline int test_main(int argc, char* argv[]) {
     if(!bool(expr)) { \
         std::stringstream ss; \
         ss << #expr << " != true"; \
-        throw assert_error(ss.str()); \
+        throw  shrtool::assert_error(ss.str()); \
     } \
 }
 
@@ -228,7 +228,7 @@ inline int test_main(int argc, char* argv[]) {
     if(bool(expr)) { \
         std::stringstream ss; \
         ss << #expr << " != false"; \
-        throw assert_error(ss.str()); \
+        throw  shrtool::assert_error(ss.str()); \
     } \
 }
 
@@ -237,7 +237,7 @@ inline int test_main(int argc, char* argv[]) {
     else { \
         std::stringstream ss; \
         ss << #expr1 << " != " << #expr2; \
-        throw assert_error(ss.str()); \
+        throw  shrtool::assert_error(ss.str()); \
     } \
 }
 
@@ -249,7 +249,7 @@ inline int test_main(int argc, char* argv[]) {
         std::stringstream ss; \
         ss << #expr1 << "(" << val1 << ")" << " != " \
             << #expr2 << "(" << val2 << ")"; \
-        throw assert_error(ss.str()); \
+        throw  shrtool::assert_error(ss.str()); \
     } \
 }
 
@@ -262,7 +262,7 @@ inline int test_main(int argc, char* argv[]) {
         std::stringstream ss; \
         ss << expr1 << "(" << val1 << ")" << " !~ " \
             << expr2 << "(" << val2 << ")"; \
-        throw assert_error(ss.str()); \
+        throw  shrtool::assert_error(ss.str()); \
     } \
 }
 
@@ -272,7 +272,7 @@ inline int test_main(int argc, char* argv[]) {
     catch(exc e) { correct_exc = true; } \
     /* catch(...) { } */ \
     if(!correct_exc) { \
-        throw assert_error("Exception " #exc \
+        throw  shrtool::assert_error("Exception " #exc \
                 " was not catched in `" #expr "`"); \
     } \
 }
@@ -280,7 +280,7 @@ inline int test_main(int argc, char* argv[]) {
 #define assert_no_except(expr) { \
     try { expr; } \
     catch(...)  { \
-        throw assert_error("Exception catched"); \
+        throw  shrtool::assert_error("Exception catched"); \
     } \
 }
 

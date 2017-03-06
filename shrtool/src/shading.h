@@ -7,10 +7,10 @@
 #include <unordered_map>
 
 #include "render_assets.h"
-#include "exception.h"
-#include "reflection.h"
-#include "utilities.h"
-#include "traits.h"
+#include "common/exception.h"
+#include "common/reflection.h"
+#include "common/utilities.h"
+#include "common/traits.h"
 
 namespace shrtool {
 

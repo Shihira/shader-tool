@@ -1,7 +1,7 @@
 #include <iostream>
 #include <chrono>
 
-#include "exception.h"
+#include "common/exception.h"
 #include "shading.h"
 
 #include <GL/glew.h>

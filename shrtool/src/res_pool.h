@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <typeinfo>
 
-#include "exception.h"
+#include "common/exception.h"
 
 namespace shrtool {
 

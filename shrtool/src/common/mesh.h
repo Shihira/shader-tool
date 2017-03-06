@@ -279,7 +279,6 @@ inline mesh_indexed mesh_indexed::gen_box(double l, double w, double h) {
     return mesh_box(l, w, h);
 }
 
-// well 
 struct mesh_io_object {
     typedef mesh_indexed mesh_type;
     typedef std::vector<mesh_type> meshes_type;

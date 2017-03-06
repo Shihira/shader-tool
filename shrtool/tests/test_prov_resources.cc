@@ -10,7 +10,7 @@ using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "mesh.h"
+#include "common/mesh.h"
 #include "properties.h"
 
 TEST_CASE(test_provided_mesh) {

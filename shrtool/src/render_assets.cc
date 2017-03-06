@@ -2,7 +2,7 @@
 #include <unordered_map>
 
 #include "render_assets.h"
-#include "exception.h"
+#include "common/exception.h"
 
 namespace shrtool {
 

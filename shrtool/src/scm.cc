@@ -4,12 +4,12 @@
 #include <sstream>
 
 #include "scm.h"
-#include "image.h"
-#include "mesh.h"
+#include "common/image.h"
+#include "common/mesh.h"
 #include "properties.h"
 #include "render_assets.h"
 #include "render_queue.h"
-#include "logger.h"
+#include "common/logger.h"
 
 #define map_idx(assc, str) scm_assq_ref((assc), scm_from_latin1_symbol(str))
 // bith = built-in type hint

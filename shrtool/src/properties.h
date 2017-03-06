@@ -7,9 +7,9 @@
 #include <vector>
 #include <initializer_list>
 
-#include "matrix.h"
-#include "traits.h"
-#include "exception.h"
+#include "common/matrix.h"
+#include "common/traits.h"
+#include "common/exception.h"
 
 namespace shrtool {
 
@@ -241,7 +241,7 @@ public:
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-#include "reflection.h"
+#include "common/reflection.h"
 
 namespace shrtool {
 

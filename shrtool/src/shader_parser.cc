@@ -1,6 +1,6 @@
 #include "shader_parser.h"
 #include "iostream"
-#include "exception.h"
+#include "common/exception.h"
 #include "scm.h"
 
 namespace shrtool {

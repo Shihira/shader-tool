@@ -1,13 +1,15 @@
-if(UNIX)
-    find_package(PkgConfig REQUIRED)
-    pkg_search_module(GUILE REQUIRED guile-2.0)
+find_library(Guile_LIBRARY guile-2.0)
+find_path(Guile_INCLUDE_DIR libguile.h
+    PATH_SUFFIXES guile/2.0)
 
-    set(Guile_LIBRARY ${GUILE_LIBRARIES})
-    set(Guile_INCLUDE_DIR ${GUILE_INCLUDE_DIRS})
+if(NOT ${Guile_LIBRARY})
+    find_library(Guile_LIBRARY guile-2.0.dll)
 endif()
 
+find_package_handle_standard_args(Guile DEFAULT_MSG
+    Guile_LIBRARY Guile_INCLUDE_DIR)
+
 mark_as_advanced(
-    Guile_FOUND
     Guile_LIBRARY
     Guile_INCLUDE_DIR
     Guile_CFLAGS

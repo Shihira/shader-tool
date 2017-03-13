@@ -1,10 +1,10 @@
 #ifndef SCM_H_INCLUDED
 #define SCM_H_INCLUDED
 
-#include <guile/2.0/libguile.h>
-
 #include "shader_parser.h"
 #include "common/reflection.h"
+
+#include <libguile.h>
 
 namespace shrtool {
 

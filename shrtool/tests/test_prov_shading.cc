@@ -39,7 +39,7 @@ TEST_CASE_FIXTURE(test_sphere, singlefunc_fixture)
             fcol4 { 0, 2, 4, 1 }
         );
     cam.transformation()
-        .rotate(M_PI / 8, tf::yOz)
+        .rotate(math::PI / 8, tf::yOz)
         .translate(item_get<2>(ill_data));
 
     transfrm m;
@@ -56,7 +56,7 @@ TEST_CASE_FIXTURE(test_sphere, singlefunc_fixture)
     s.property("material", pmat);
 
     update = [&]() {
-        m.rotate(M_PI / 120, tf::zOx);
+        m.rotate(math::PI / 120, tf::zOx);
 
         provider<decltype(m), property_buffer>::update(m, pm, true);
     };
@@ -93,7 +93,7 @@ TEST_CASE_FIXTURE(test_earth, singlefunc_fixture)
     universal_property<fcol4> ill_data( col4 { -300, 0, 50, 1 }); // far~~
 
     transfrm m;
-    m.rotate(-M_PI / 6, tf::yOz);
+    m.rotate(-math::PI / 6, tf::yOz);
 
     auto pm = provider<decltype(m), property_buffer>::load(m);
     auto pvp = provider<decltype(cam), property_buffer>::load(cam);
@@ -108,9 +108,9 @@ TEST_CASE_FIXTURE(test_earth, singlefunc_fixture)
     s.property("texMap", tex);
 
     update = [&]() {
-        m.rotate(M_PI / 6, tf::yOz)
-         .rotate(M_PI / 480, tf::zOx)
-         .rotate(-M_PI / 6, tf::yOz);
+        m.rotate(math::PI / 6, tf::yOz)
+         .rotate(math::PI / 480, tf::zOx)
+         .rotate(-math::PI / 6, tf::yOz);
 
         provider<decltype(m), property_buffer>::update(m, pm, true);
     };
@@ -137,7 +137,7 @@ TEST_CASE_FIXTURE(test_render_target, singlefunc_fixture) {
     cam.set_bgcolor(color(51, 51, 51));
     cam.transformation()
         .translate(0, 0, 5)
-        .rotate(M_PI / 8, tf::yOz);
+        .rotate(math::PI / 8, tf::yOz);
 
     ifstream shr_fs(locate_assets("shaders/solid-color.scm"));
     ofstream img_fs("output.ppm");

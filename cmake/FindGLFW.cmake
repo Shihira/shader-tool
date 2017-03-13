@@ -1,15 +1,12 @@
-if(UNIX)
-    find_package(PkgConfig REQUIRED)
-    pkg_search_module(GLFW REQUIRED glfw3)
+find_library(GLFW_LIBRARY
+    NAMES glfw3 glfw)
+find_path(GLFW_INCLUDE_DIR GLFW/glfw3.h)
 
-    set(GLFW_LIBRARY ${GLFW_LIBRARIES})
-    set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
-endif()
+find_package_handle_standard_args(GLFW DEFAULT_MSG
+    GLFW_LIBRARY GLFW_INCLUDE_DIR)
 
 mark_as_advanced(
-    GLFW_FOUND
     GLFW_LIBRARY
     GLFW_INCLUDE_DIR
-    GLFW_CFLAGS
 )
 

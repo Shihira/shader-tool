@@ -274,7 +274,7 @@ struct camera : render_target {
 
     camera() :
         auto_viewport_(true),
-        visible_angle_(M_PI / 2),
+        visible_angle_(math::PI / 2),
         near_clip_plane_(1),
         far_clip_plane_(100),
         aspect_(0)

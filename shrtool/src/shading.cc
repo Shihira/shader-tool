@@ -364,12 +364,12 @@ std::vector<math::mat4> camera::get_cubemap_view_mat() const {
     constexpr int
         pos_x = 0, pos_y = 2, pos_z = 4,
         neg_x = 1, neg_y = 3, neg_z = 5;
-    ms[pos_z] = math::tf::rotate(M_PI, math::tf::yOz);
-    ms[pos_x] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[pos_z];
-    ms[neg_z] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[pos_x];
-    ms[neg_x] = math::tf::rotate(-M_PI/2, math::tf::zOx) * ms[neg_z];
-    ms[pos_y] = math::tf::rotate(-M_PI/2, math::tf::yOz) * ms[pos_z];
-    ms[neg_y] = math::tf::rotate( M_PI/2, math::tf::yOz) * ms[pos_z];
+    ms[pos_z] = math::tf::rotate(math::PI, math::tf::yOz);
+    ms[pos_x] = math::tf::rotate(-math::PI/2, math::tf::zOx) * ms[pos_z];
+    ms[neg_z] = math::tf::rotate(-math::PI/2, math::tf::zOx) * ms[pos_x];
+    ms[neg_x] = math::tf::rotate(-math::PI/2, math::tf::zOx) * ms[neg_z];
+    ms[pos_y] = math::tf::rotate(-math::PI/2, math::tf::yOz) * ms[pos_z];
+    ms[neg_y] = math::tf::rotate( math::PI/2, math::tf::yOz) * ms[pos_z];
     return std::move(ms);
 }
 

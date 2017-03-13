@@ -253,14 +253,14 @@ TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
 
     mat4 model_mat = tf::identity();
     mat4 view_mat = inverse(
-            tf::rotate(M_PI / 8, tf::yOz) *
+            tf::rotate(math::PI / 8, tf::yOz) *
             tf::translate(col4 {
                 prop_illum_data[8 + 0],
                 prop_illum_data[8 + 1],
                 prop_illum_data[8 + 2],
                 prop_illum_data[8 + 3],
             }));
-    mat4 proj_mat = tf::perspective(M_PI / 4, 4.0 / 3, 1, 100);
+    mat4 proj_mat = tf::perspective(math::PI / 4, 4.0 / 3, 1, 100);
 
     // fill attributes
     attr_vec.primitives_count(cube_num_vertices);
@@ -303,7 +303,7 @@ TEST_CASE_FIXTURE(test_cube, singlefunc_fixture) {
     shr.property("material", prop_material);
 
     update = [&]() {
-        model_mat *= tf::rotate(M_PI / 120, tf::zOx);
+        model_mat *= tf::rotate(math::PI / 120, tf::zOx);
 
         float* ptr = prop_mvp.start_map<float>(
                 buffer::WRITE, sizeof(float) * 16 * 2);
@@ -425,14 +425,14 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
 
     mat4 model_mat = tf::identity();
     mat4 view_mat = inverse(
-            tf::rotate(M_PI / 8, tf::yOz) *
+            tf::rotate(math::PI / 8, tf::yOz) *
             tf::translate(col4 {
                 prop_illum_data[8 + 0],
                 prop_illum_data[8 + 1],
                 prop_illum_data[8 + 2],
                 prop_illum_data[8 + 3],
             }));
-    mat4 proj_mat = tf::perspective(M_PI / 4, 4.0 / 3, 1, 100);
+    mat4 proj_mat = tf::perspective(math::PI / 4, 4.0 / 3, 1, 100);
 
     // fill attributes
     vertex_attr_buffer
@@ -485,7 +485,7 @@ TEST_CASE_FIXTURE(test_texture_support, singlefunc_fixture) {
     shr.property("diffuseTex", diffuse_tex);
 
     update = [&]() {
-        model_mat *= tf::rotate(M_PI / 120, tf::zOx);
+        model_mat *= tf::rotate(math::PI / 120, tf::zOx);
 
         float* ptr = prop_mvp.start_map<float>(
                 buffer::WRITE, sizeof(float) * 16 * 2);

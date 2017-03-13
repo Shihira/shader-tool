@@ -117,13 +117,13 @@ struct rotate_model_fixture : singlefunc_fixture {
         bool updated = false;
 
         if(actions[0] && (updated |= actions[0]))
-            model_mat.rotate(M_PI / 120, tf::zOx);
+            model_mat.rotate(math::PI / 120, tf::zOx);
         if(actions[1] && (updated |= actions[1]))
-            model_mat.rotate(-M_PI / 120, tf::zOx);
+            model_mat.rotate(-math::PI / 120, tf::zOx);
         if(actions[2] && (updated |= actions[2]))
-            model_mat.rotate(M_PI / 120, tf::yOz);
+            model_mat.rotate(math::PI / 120, tf::yOz);
         if(actions[3] && (updated |= actions[3]))
-            model_mat.rotate(-M_PI / 120, tf::yOz);
+            model_mat.rotate(-math::PI / 120, tf::yOz);
 
         return updated;
     }
@@ -179,7 +179,7 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
         );
 
     cam.transformation()
-        .rotate(M_PI / 8, tf::yOz)
+        .rotate(math::PI / 8, tf::yOz)
         .translate(item_get<2>(ill_data));
 
     provided_render_task::provider_bindings bindings;

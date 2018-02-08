@@ -11,6 +11,63 @@
 
 namespace shrtool {
 
+// useful macros
+
+template<typename T, typename Enable = void>
+struct prop_get_ret_type__ {
+    typedef const T& ret_type;
+};
+
+template<typename T>
+struct prop_get_ret_type__<T, typename std::enable_if<
+        std::is_scalar<T>::value>::type> {
+    typedef T ret_type;
+};
+
+#define PROPERTY_GENERIC_RW(type, name, befr, aftr, befw, aftw) \
+    protected: type name##_; \
+    public: typename prop_get_ret_type__<type>::ret_type get_##name() const { befr; return name##_; aftr; } \
+    public: void set_##name(type const & v) { befw; name##_ = v; aftw; }
+
+#define PROPERTY_GENERIC_RO(type, name, befr, aftr) \
+    protected: type name##_; \
+    public: typename prop_get_ret_type__<type>::ret_type get_##name() const { befr; return name##_; aftr; }
+
+#define PROPERTY_GENERIC_WO(type, name, chan_tag, befw, aftw) \
+    protected: type name##_; \
+    public: void set_##name(type const & v) { befw; name##_ = v; aftw; }
+
+#define PROPERTY_RW(type, name) \
+    PROPERTY_GENERIC_RW(type, name, {}, {}, {}, {})
+// DR/DW indicated reading/writing is being decorated
+#define PROPERTY_DR_W(type, name, befr, aftr) \
+    PROPERTY_GENERIC_RW(type, name, befw, aftw, {}, {})
+#define PROPERTY_R_DW(type, name, befw, aftw) \
+    PROPERTY_GENERIC_RW(type, name, {}, {}, befw, aftw)
+
+#define PROPERTY_RO(type, name) \
+    PROPERTY_GENERIC_RO(type, name, {}, {})
+#define PROPERTY_WO(type, name) \
+    PROPERTY_GENERIC_WO(type, name, {}, {})
+
+#define PROP_ASSERT(cond, reason) { if(!(cond)) throw shrtool::restriction_error(reason); }
+#define PROP_MARKCHG(change_tag) { change_tag = true; }
+#define PROP_MARKCHG2(change_tag1, change_tag2) { change_tag1 = true; change_tag2 = true; }
+
+#define DEF_ENUM_MAP(fn, from_type, to_type, map_content) \
+    static to_type fn(from_type e) { \
+        static const std::unordered_map<from_type, to_type> \
+            trans_map_ map_content; \
+        auto i_ = trans_map_.find(e); \
+        if(i_ == trans_map_.end())  {\
+            std::stringstream ss; \
+            ss << "Failed when mapping " << #fn << ": " << e; \
+            throw shrtool::enum_map_error(ss.str()); \
+        } \
+        return i_->second; \
+    }
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // color
 
@@ -204,6 +261,7 @@ struct fcolor {
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<fcolor>("fcolor")
+            .enable_construct<float, float, float, float>()
             .enable_clone()
             .enable_equal()
             .enable_auto_register()
@@ -212,6 +270,8 @@ struct fcolor {
             .function("b", &color::b)
             .function("a", &color::a)
             .function("rgba", &color::rgba);
+
+        refl::meta_manager::enable_cast<color, fcolor>();
     }
 
     static constexpr color_format format() {
@@ -335,7 +395,18 @@ inline std::ostream& operator<<(std::ostream& os, const rect& c)
 ////////////////////////////////////////////////////////////////////////////////
 // transfrm
 
-struct transfrm {
+struct base_transfrm {
+    virtual const math::mat4& get_mat() const = 0;
+    virtual const math::mat4& get_inverse_mat() const = 0;
+
+    bool is_changed() const { return changed_; }
+    void mark_applied() { changed_ = false; }
+
+protected:
+    bool changed_ = false;
+};
+
+struct transfrm : base_transfrm {
     transfrm() :
         mat_(math::tf::identity()),
         inv_mat_(math::tf::identity()) { }
@@ -384,11 +455,97 @@ struct transfrm {
         return *this;
     }
 
+    transfrm& rotate(const math::col3& rot) {
+        rotate(rot[0], math::tf::yOz);
+        rotate(rot[2], math::tf::xOy);
+        rotate(rot[1], math::tf::zOx);
+        return *this;
+    }
+
+    transfrm& rotate_axis(double angle, math::col3 vec) {
+        vec = vec / math::norm(vec);
+
+        math::mat4 w = {
+            0, -vec[2], vec[1], 0,
+            vec[2], 0, -vec[0], 0,
+            -vec[1], vec[0], 0, 0,
+            0, 0, 0, 0,
+        };
+        math::mat4 w2 = w * w;
+
+        double c = cos(angle), s = sin(angle);
+
+        math::mat4 m = math::tf::identity() + w2 * (1 - c) + w * s;
+        m.at(3, 3) = 1;
+
+        mat_ = m * mat_;
+        inv_mat_ *= math::inverse(m);
+        changed_ = true;
+
+        return *this;
+    }
+
     transfrm& scale(double x, double y, double z) {
         mat_ = math::tf::scale(x, y, z) * mat_;
         inv_mat_ = inv_mat_ * math::tf::scale(1/x, 1/y, 1/z);
         changed_ = true;
         return *this;
+    }
+
+    transfrm& scale(double s) {
+        return scale(s, s, s);
+    }
+
+    math::col3 get_rotation_euler() const {
+        math::col3 euler;
+
+        if (mat_.at(1, 0) > 0.998) { // singularity at north pole
+            euler[0] = 0;
+            euler[1] = -atan2(mat_.at(0, 2),mat_.at(2, 2));
+            euler[2] = M_PI/2;
+        }
+        else if (mat_.at(1, 0) < -0.998) { // singularity at south pole
+            euler[0] = 0;
+            euler[1] = -atan2(mat_.at(0, 2),mat_.at(2, 2));
+            euler[2] = -M_PI/2;
+        }
+        else {
+            euler[0] = -atan2(-mat_.at(1, 2),mat_.at(1, 1));
+            euler[1] = -atan2(-mat_.at(2, 0),mat_.at(0, 0));
+            euler[2] = asin(mat_.at(1, 0));
+        }
+
+        /*
+        // this piece of code is used to test the applying order
+        int orders[6][3] = {
+            {0, 1, 2}, {0, 2, 1}, {1, 0, 2},
+            {1, 2, 0}, {2, 0, 1}, {2, 1, 0},
+        };
+
+        for(int i = 0; i < 6; i++) {
+            transfrm tf;
+
+            for(int j = 0; j < 3; j++) {
+                int o = orders[i][j];
+                tf.rotate(euler[o], (shrtool::math::tf::plane)((o + 1) % 3));
+            }
+
+            double err = 0;
+            for(int r = 0; r < 3; r++)
+            for(int c = 0; c < 3; c++)
+                err += tf.get_mat().at(r, c) - get_mat().at(r, c);
+
+            std::cout << i << ": " << err << std::endl;
+        }
+        */
+
+        return euler;
+    }
+
+    math::col4 get_translation() const {
+        math::col4 c = mat_.col(3);
+        c /= c[3];
+        return c;
     }
 
     void set_mat(const math::mat4& m) {
@@ -401,11 +558,22 @@ struct transfrm {
         return a.mat_ == mat_;
     }
 
+    transfrm& operator*=(const base_transfrm& tf) {
+        mat_ = tf.get_mat() * mat_;
+        inv_mat_ *= tf.get_inverse_mat();
+        changed_ = true;
+        return *this;
+    }
+
+    transfrm& operator*=(const math::mat4& m) {
+        mat_ = m * mat_;
+        inv_mat_ *= math::inverse(m);
+        changed_ = true;
+        return *this;
+    }
+
     const math::mat4& get_mat() const { return mat_; }
     const math::mat4& get_inverse_mat() const { return inv_mat_; }
-
-    bool is_changed() const { return changed_; }
-    void mark_applied() { changed_ = false; }
 
     static void meta_reg_() {
         refl::meta_manager::reg_class<transfrm>("transfrm")
@@ -413,17 +581,75 @@ struct transfrm {
             .enable_clone()
             .enable_equal()
             .enable_auto_register()
-            .function("rotate", &transfrm::rotate)
-            .function("scale", &transfrm::scale)
+            .function("rotate", static_cast<transfrm&(transfrm::*)(double, math::tf::plane)>(&transfrm::rotate))
+            .function("scale", static_cast<transfrm&(transfrm::*)(double, double, double)>(&transfrm::scale))
             .function("translate", static_cast<transfrm&(transfrm::*)(double, double, double)>(&transfrm::translate))
             .function("get_mat", &transfrm::get_mat)
             .function("get_inverse_mat", &transfrm::get_inverse_mat);
     }
 
 protected:
-    bool changed_ = true;
     math::mat4 mat_;
     math::mat4 inv_mat_;
+};
+
+struct trs_transfrm : base_transfrm {
+    PROPERTY_R_DW(math::quat, rotation, {}, PROP_MARKCHG2(changed_, mat_update_))
+    PROPERTY_R_DW(math::col3, position, {}, PROP_MARKCHG2(changed_, mat_update_))
+    PROPERTY_R_DW(math::col3, scaling, {}, PROP_MARKCHG2(changed_, mat_update_))
+
+    const math::mat4& get_mat() const {
+        update_mat();
+        return mat_;
+    }
+
+    const math::mat4& get_inverse_mat() const {
+        update_mat();
+        return inv_mat_;
+    }
+
+    void set_mat(const math::mat4& m) {
+        position_ = math::col3(m.col(3) / m.at(3, 3));
+        scaling_[0] = math::norm(math::col4(m.col(0)));
+        scaling_[1] = math::norm(math::col4(m.col(1)));
+        scaling_[2] = math::norm(math::col4(m.col(2)));
+
+        math::mat4 a = m;
+        a.col(0) /= scaling_[0];
+        a.col(1) /= scaling_[1];
+        a.col(2) /= scaling_[2];
+        a.col(3) = math::col4 { 0, 0, 0, 1 };
+
+        rotation_[3] = std::sqrt(1 + a.at(0, 0) + a.at(1, 1) + a.at(2, 2)) / 2;
+        double w4 = 4 * rotation_[3];
+        rotation_[0] = (a.at(2, 1) - a.at(1, 2)) / w4;
+        rotation_[1] = (a.at(0, 2) - a.at(2, 0)) / w4;
+        rotation_[2] = (a.at(1, 0) - a.at(0, 1)) / w4;
+
+        mat_update_ = true;
+    }
+
+private:
+    mutable math::mat4 mat_;
+    mutable math::mat4 inv_mat_;
+
+protected:
+    mutable bool mat_update_ = true;
+
+    void update_mat() const {
+        using namespace math;
+
+        if(!mat_update_) return;
+
+        mat_ = tf::identity() *
+            tf::translate(position_) *
+            tf::rotate(rotation_) *
+            tf::scale(scaling_);
+
+        inv_mat_ = inverse(mat_);
+
+        mat_update_ = false;
+    }
 };
 
 template<>
@@ -455,61 +681,5 @@ struct prop_trait<transfrm> {
 };
 
 }
-
-// useful macros
-
-template<typename T, typename Enable = void>
-struct prop_get_ret_type__ {
-    typedef const T& ret_type;
-};
-
-template<typename T>
-struct prop_get_ret_type__<T, typename std::enable_if<
-        std::is_scalar<T>::value>::type> {
-    typedef T ret_type;
-};
-
-#define PROPERTY_GENERIC_RW(type, name, befr, aftr, befw, aftw) \
-    protected: type name##_; \
-    public: typename prop_get_ret_type__<type>::ret_type get_##name() const { befr; return name##_; aftr; } \
-    public: void set_##name(type const & v) { befw; name##_ = v; aftw; }
-
-#define PROPERTY_GENERIC_RO(type, name, befr, aftr) \
-    protected: type name##_; \
-    public: typename prop_get_ret_type__<type>::ret_type get_##name() const { befr; return name##_; aftr; }
-
-#define PROPERTY_GENERIC_WO(type, name, chan_tag, befw, aftw) \
-    protected: type name##_; \
-    public: void set_##name(type const & v) { befw; name##_ = v; aftw; }
-
-#define PROPERTY_RW(type, name) \
-    PROPERTY_GENERIC_RW(type, name, {}, {}, {}, {})
-// DR/DW indicated reading/writing is being decorated
-#define PROPERTY_DR_W(type, name, befr, aftr) \
-    PROPERTY_GENERIC_RW(type, name, befw, aftw, {}, {})
-#define PROPERTY_R_DW(type, name, befw, aftw) \
-    PROPERTY_GENERIC_RW(type, name, {}, {}, befw, aftw)
-
-#define PROPERTY_RO(type, name) \
-    PROPERTY_GENERIC_RO(type, name, {}, {})
-#define PROPERTY_WO(type, name) \
-    PROPERTY_GENERIC_WO(type, name, {}, {})
-
-#define PROP_ASSERT(cond, reason) { if(!(cond)) throw shrtool::restriction_error(reason); }
-#define PROP_MARKCHG(change_tag) { change_tag = true; }
-#define PROP_MARKCHG2(change_tag1, change_tag2) { change_tag1 = true; change_tag2 = true; }
-
-#define DEF_ENUM_MAP(fn, from_type, to_type, map_content) \
-    static to_type fn(from_type e) { \
-        static const std::unordered_map<from_type, to_type> \
-            trans_map_ map_content; \
-        auto i_ = trans_map_.find(e); \
-        if(i_ == trans_map_.end())  {\
-            std::stringstream ss; \
-            ss << "Failed when mapping " << #fn << ": " << e; \
-            throw shrtool::enum_map_error(ss.str()); \
-        } \
-        return i_->second; \
-    }
 
 #endif // UTILITIES_H_INCLUDED

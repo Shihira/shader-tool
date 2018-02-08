@@ -72,7 +72,7 @@ void shader_render_task::render() const {
 
     shr_->target(*target_);
 
-    shr_->draw(*attr_);
+    shr_->draw(*attr_, render_count_);
 }
 
 void queue_render_task::render() const {

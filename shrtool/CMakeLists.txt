@@ -2,19 +2,22 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(GLFW REQUIRED)
 find_package(Guile REQUIRED)
+find_package(assimp REQUIRED)
 
 set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${GLFW_INCLUDE_DIR}
     ${Guile_INCLUDE_DIR}
     ${OpenGL_INCLUDE_DIR}
-    ${GLEW_INCLUDE_DIR})
+    ${GLEW_INCLUDE_DIR}
+    ${ASSIMP_INCLUDE_DIR})
 
 set(LINK_LIBS
     ${Guile_LIBRARY}
     ${OPENGL_gl_LIBRARY}
     ${GLEW_LIBRARY}
-    ${GLFW_LIBRARY})
+    ${GLFW_LIBRARY}
+    ${ASSIMP_LIBRARY})
 
 file(GLOB_RECURSE ALL_SOURCE src/*.cc src/common/*.cc) 
 

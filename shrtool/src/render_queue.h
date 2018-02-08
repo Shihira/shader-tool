@@ -150,7 +150,9 @@ class shader_render_task : public render_task {
     std::map<std::string, render_assets::property_buffer*> prop_;
     std::map<std::string, render_assets::texture*> prop_tex_;
 
+    PROPERTY_RW(size_t, render_count);
 public:
+
     shader_render_task() { reset(); }
 
     render_target* get_target() { return target_; }
@@ -163,6 +165,7 @@ public:
     void set_target(render_target& t) { target_ = &t; }
     void set_attributes(vertex_attr_vector& v) { attr_ = &v; }
     void reset() {
+        render_count_ = 1;
         shr_ = nullptr;
         target_ = &render_target::screen;
         attr_ = nullptr;

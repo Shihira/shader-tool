@@ -163,7 +163,7 @@ TEST_CASE_FIXTURE(test_shading, rotate_model_fixture) {
         transfrm(),
         transfrm().scale(1./30, 1./30, 1./30),
         transfrm()
-            .translate(- find_average(chs[2]).cutdown<col3>())
+            .translate(-col3(find_average(chs[2])))
             .scale(1./60, 1./60, 1./60),
     };
 

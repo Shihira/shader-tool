@@ -742,7 +742,7 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...))
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<pure_ret_t>::convert(
             func_caller(args, n, std::function<RetType(T&, Args...)>(
-                [&args, f](T& t, Args ... a) -> RetType {
+                [/*&args, */f](T& t, Args ... a) -> RetType {
                     return (t.*f)(std::forward<Args>(a) ...);
                 })));
     };
@@ -755,7 +755,7 @@ meta& meta::function(std::string name, void (T::*f) (Args...))
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         func_caller(args, n, std::function<void(T&, Args...)>(
-            [&args, f](T& t, Args ... a) {
+            [/*&args, */f](T& t, Args ... a) {
                 (t.*f)(std::forward<Args>(a) ...);
             }));
         return instance();
@@ -771,7 +771,7 @@ meta& meta::function(std::string name, RetType (T::*f) (Args...) const)
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         return ret_type_<pure_ret_t>::convert(
             func_caller(args, n, std::function<RetType(T&, Args...)>(
-                [&args, f](T& t, Args ... a) -> RetType {
+                [/*&args, */f](T& t, Args ... a) -> RetType {
                     return (t.*f)(std::forward<Args>(a) ...);
                 })));
     };
@@ -784,7 +784,7 @@ meta& meta::function(std::string name, void (T::*f) (Args...) const)
 {
     functions[std::move(name)] = [f](instance* args[], size_t n) -> instance {
         func_caller(args, n, std::function<void(T&, Args...)>(
-            [&args, f](T& t, Args ... a) {
+            [/*&args, */f](T& t, Args ... a) {
                 (t.*f)(std::forward<Args>(a) ...);
             }));
         return instance();

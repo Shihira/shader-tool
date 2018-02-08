@@ -16,6 +16,32 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; display texture
 
+(define-public shader-def-quad
+  (lambda (property fragment-shader)
+    `((name . "quad")
+      ,shader-def-attr-mesh
+      (property-group
+        (name . "textures")
+        (layout
+         (tex2d . "texMap")))
+      ,property
+      (sub-shader
+        (type . fragment)
+        (source . ,(string-append "
+          in vec2 texCoord;
+          out vec4 outColor;
+          " fragment-shader)))
+      (sub-shader
+        (type . vertex)
+        (source . ,(string-append "
+          out vec2 texCoord;
+          vec2 procCoord(float x, float y) { return vec2(x, y); }
+          void main() {
+              gl_Position = vec4(position.z, position.x, 0, 1);
+              texCoord = procCoord(position.z, position.x) / 2 + vec2(0.5, 0.5);
+          }"))))))
+    
+
 (define display-texture-config
   (lambda (procColor procCoord)
   `((name . "solid-color")

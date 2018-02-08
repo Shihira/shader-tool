@@ -1,5 +1,6 @@
 #include <iostream>
 #include <chrono>
+#include <regex>
 
 #include "common/exception.h"
 #include "shading.h"
@@ -106,14 +107,10 @@ void render_target::attach_texture(
     if((tex.get_trait() & texture::CUBEMAP) == 0) {
         glBindFramebuffer(GL_FRAMEBUFFER, id());
         tex.attach_to(att);
-        if(ba != DEPTH_BUFFER)
-            glDrawBuffer(att);
         glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
     } else {
         glBindFramebuffer(GL_FRAMEBUFFER, id());
         tex.attach_to((att << 3) + 0);
-        if(ba != DEPTH_BUFFER)
-            glDrawBuffer(att);
         glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
 
         if(sub_targets_.size() > 5) {
@@ -177,6 +174,17 @@ void render_target::apply_properties() const
             break;
     }
 
+    if(!is_screen()) {
+        std::vector<GLuint> dbs;
+        for(auto e : tex_attachments_) {
+            auto att = em_buffer_attachment_(e.first);
+            if(att >= GL_COLOR_ATTACHMENT0 &&
+                att <= GL_COLOR_ATTACHMENT0 + 16) { // max number gl allows
+                dbs.push_back(att);
+            }
+        }
+        glDrawBuffers(dbs.size(), dbs.data());
+    }
 }
 
 void render_target::clear_buffer(render_target::buffer_attachment ba) const {
@@ -264,11 +272,9 @@ void shader::property(size_t binding,
     textures_binding_[binding] = &tex;
 }
 
-void shader::draw(const vertex_attr_vector& vat) const {
+void shader::draw(const vertex_attr_vector& vat, size_t count) const {
     glUseProgram(id());
     glBindVertexArray(vat.id());
-
-    target_->apply_properties();
 
     // bind textures
     size_t tex_num = 0;
@@ -280,14 +286,20 @@ void shader::draw(const vertex_attr_vector& vat) const {
 
     if(!target_->has_multiple_pass()) {
         glBindFramebuffer(GL_FRAMEBUFFER, target_->id());
-        glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+        target_->apply_properties();
+        count == 1 ?
+            glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count()) :
+            glDrawArraysInstanced(GL_TRIANGLES, 0, vat.primitives_count(), count);
         glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
     } else {
         for(int i = 0; i < target_->sub_targets_.size() + 1; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER,
                 i == 0 ? target_->id() : target_->sub_targets_[i-1]);
+            target_->apply_properties();
             glUniform1i(glGetUniformLocation(id(), "renderPass_"), i);
-            glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count());
+            count == 1 ?
+                glDrawArrays(GL_TRIANGLES, 0, vat.primitives_count()) :
+                glDrawArraysInstanced(GL_TRIANGLES, 0, vat.primitives_count(), count);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, GL_NONE);
     }
@@ -298,6 +310,10 @@ void shader::draw(const vertex_attr_vector& vat) const {
     for(auto& e : textures_binding_) {
         e.second->bind_to(-1);
     }
+}
+
+void shader::draw(const vertex_attr_vector& vat) const {
+    draw(vat, 1);
 }
 
 void shader::link() {
@@ -330,12 +346,48 @@ void sub_shader::compile(const std::string& s) {
     glGetShaderiv(id(), GL_COMPILE_STATUS, &status);
 
     if(status == GL_FALSE) {
+        using namespace std;
+
         GLint log_len, actual_log_len;
         glGetShaderiv(id(), GL_INFO_LOG_LENGTH, &log_len);
-        std::vector<char> log_str(log_len);
-        glGetShaderInfoLog(id(), log_len + 1, &actual_log_len, log_str.data());
-        throw shader_error(std::string("Error while compiling ")
-                + em_shader_type_str_(type_) + ":\n" + log_str.data());
+        vector<char> log_buf(log_len + 1);
+        glGetShaderInfoLog(id(), log_len, &actual_log_len, log_buf.data());
+
+        vector<string> lines;
+        vector<string> log_lines;
+
+        std::stringstream ss;
+
+        ss.str(s);
+        ss.clear();
+        ss.seekp(0);
+        while(!ss.eof()) {
+            string l; getline(ss, l);
+            lines.emplace_back(std::move(l));
+        }
+
+        ss.str(log_buf.data());
+        ss.clear();
+        ss.seekp(0);
+        while(!ss.eof()) {
+            string l; getline(ss, l);
+            log_lines.emplace_back(std::move(l));
+        }
+
+        ss.str("");
+        ss.clear();
+        ss.seekg(0);
+        for(string& l : log_lines) {
+            smatch mr;
+            if(regex_search(l, mr, regex("(\\d+)\\((\\d+)\\)"))) {
+                ss << lines[stoi(mr[1]) - 1] << endl;
+                //ss << string(stoi(mr[2]) - 1, ' ') << '^' << endl;
+            }
+            ss << l << endl;
+        }
+
+        throw shader_error(string("Error while compiling ") +
+                em_shader_type_str_(type_) + ":\n" + ss.str());
     }
 }
 

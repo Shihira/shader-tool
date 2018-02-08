@@ -388,9 +388,8 @@ struct matrix :
 {
 private:
     typedef std::array<T, M * N> container_type;
-    typedef std::unique_ptr<container_type> __pointer;
-
-    __pointer data_;
+    //typedef std::unique_ptr<container_type> __pointer;
+    container_type data_;
 
 public:
     typedef T value_type;
@@ -406,44 +405,57 @@ public:
     static constexpr size_t cols = N;
     static constexpr bool is_vector = M == 1 || N == 1;
 
-    matrix() : data_(new container_type)
+    matrix() //: data_(new container_type)
         { std::fill(begin(), end(), 0); }
     matrix(const std::initializer_list<T>& l)
-        : data_(new container_type)
+        //: data_(new container_type)
         { std::copy(l.begin(), l.end(), begin()); }
     matrix(const matrix& m)
-        : data_(new container_type)
+        //: data_(new container_type)
         { std::copy(m.begin(), m.end(), begin()); }
     template<typename OtherT>
     matrix(const matrix<OtherT, M, N>& m)
-        : data_(new container_type)
+        //: data_(new container_type)
         { std::copy(m.begin(), m.end(), begin()); }
-    matrix(matrix&& m) : data_(std::move(m.data_)) { }
+    //matrix(matrix&& m) : data_(std::move(m.data_)) { }
+    template<typename OtherT, size_t M_, size_t N_>
+    explicit matrix(const matrix<OtherT, M_, N_>& mat) {
+        T* dst = data();
+        const OtherT* src = mat.data();
+        for(size_t m = 0; m < mpl_min__(M_, M); m++) {
+            for(size_t n = 0; n < mpl_min__(N_, N); n++)
+                dst[n] = src[n];
+            dst += N;
+            src += N_;
+        }
+    }
 
     matrix operator+(const matrix& m) const {
         matrix result;
 
-        auto dst_i = result.begin();
-        auto src1_i = m.begin(), src2_i = begin();
-        for(; dst_i != result.end() && src1_i != m.end() && src2_i != m.end();
-                ++dst_i, ++src1_i, ++src2_i)
-            *dst_i = *src1_i + *src2_i;
+        auto dst = &(*result.begin());
+        auto src1 = &(*m.begin());
+        auto src2 = &(*begin());
+
+        for(int i = 0; i < M * N; i++)
+            dst[i] = src1[i] + src2[i];
 
         return result;
     }
 
-    value_type* data() { return data_->data(); }
-    const value_type* data() const { return data_->data(); }
+    value_type* data() { return data_.data(); }
+    const value_type* data() const { return data_.data(); }
 
     template<typename Numeric> typename std::enable_if<
         std::is_arithmetic<Numeric>::value, matrix>::type
     operator*(Numeric n) const {
         matrix result;
 
-        auto dst_i = result.begin();
-        auto src_i = begin();
-        for(; dst_i != result.end() && src_i != end(); ++dst_i, ++src_i)
-            *dst_i = *src_i * n;
+        auto dst = &*result.begin();
+        auto src = &*begin();
+
+        for(int i = 0; i < M * N; i++)
+            dst[i] = src[i] * n;
 
         return result;
     }
@@ -467,10 +479,11 @@ public:
     operator/(Numeric n) const {
         matrix result;
 
-        auto dst_i = result.begin();
-        auto src_i = begin();
-        for(; dst_i != result.end() && src_i != end(); ++dst_i, ++src_i)
-            *dst_i = *src_i / n;
+        auto dst = &*result.begin();
+        auto src = &*begin();
+
+        for(int i = 0; i < M * N; i++)
+            dst[i] = src[i] / n;
 
         return result;
     }
@@ -478,14 +491,14 @@ public:
     /*
      * row-major order iterator
      */
-    iterator begin() { return data_->begin(); }
-    iterator end() { return data_->end(); }
+    iterator begin() { return data_.begin(); }
+    iterator end() { return data_.end(); }
 
-    const_iterator begin() const { return data_->begin(); }
-    const_iterator end() const { return data_->end(); }
+    const_iterator begin() const { return data_.begin(); }
+    const_iterator end() const { return data_.end(); }
 
-    const_iterator cbegin() const { return data_->cbegin(); }
-    const_iterator cend() const { return data_->cend(); }
+    const_iterator cbegin() const { return data_.cbegin(); }
+    const_iterator cend() const { return data_.cend(); }
 
     matrix& operator=(const matrix& m) {
         std::copy(m.begin(), m.end(), begin());
@@ -557,15 +570,6 @@ public:
         }
         return true;
     }
-
-    template<typename Mat>
-    Mat cutdown() const {
-        Mat new_mat;
-        for(size_t m = 0; m < mpl_min__(Mat::rows, rows); m++)
-            for(size_t n = 0; n < mpl_min__(Mat::cols, cols); n++)
-                new_mat.at(m, n) = at(m, n);
-        return new_mat;
-    }
 };
 
 template<typename T>
@@ -600,6 +604,67 @@ template<typename IterType, typename VecType>
 std::ostream& operator<<(std::ostream& s,
         const vector_ref<IterType, VecType>& v) {
     return operator<<(s, VecType(v));
+}
+
+template<typename T>
+struct quaternion :
+    unequal_operator_decorator   <quaternion<T>>,
+    plus_equal_operator_decorator<quaternion<T>>,
+    subs_equal_operator_decorator<quaternion<T>>,
+    mult_equal_operator_decorator<quaternion<T>>
+{
+private:
+    typedef std::array<T, 4> container_type;
+    container_type data_;
+
+public:
+    bool operator==(const quaternion& q2) {
+        bool b = true;
+        for(size_t i = 0; i < 4; i++)
+            b &= (data_[i] == q2[i]);
+        return b;
+    };
+
+    T operator[](size_t i) const { return data_[i]; }
+    T& operator[](size_t i) { return data_[i]; }
+
+    quaternion operator+(const quaternion& q2) {
+        quaternion q;
+        for(size_t i = 0; i < 4; i++)
+            q[i] = (*this)[i] + q2[i];
+        return q;
+    }
+
+    template<typename Numeric> typename std::enable_if<
+        std::is_arithmetic<Numeric>::value, quaternion>::type
+    operator*(Numeric n) {
+        quaternion q;
+        for(size_t i = 0; i < 4; i++)
+            q[i] = (*this)[i] * n;
+        return q;
+    }
+
+    template<typename Numeric> typename std::enable_if<
+        std::is_arithmetic<Numeric>::value, quaternion>::type
+    operator/(Numeric n) {
+        quaternion q;
+        for(size_t i = 0; i < 4; i++)
+            q[i] = (*this)[i] / n;
+        return q;
+    }
+
+    quaternion operator-(const quaternion& m) const { return operator+(-m); }
+    quaternion operator-() const { return operator*(-1); }
+};
+
+template<typename T>
+std::ostream& operator<<(std::ostream& s, const quaternion<T>& q) {
+    for(size_t m = 0; m < 4; m++) {
+        s <<
+            (m == 0 ? "[ " : "") << q[m] <<
+            (m == 3 ? " ]" : ",\t");
+    }
+    return s;
 }
 
 #undef CSELF
@@ -666,18 +731,8 @@ typedef row<int32_t, 3> irow3;
 typedef row<int32_t, 2> irow2;
 typedef row<int32_t, 1> irow1;
 
-template<typename T, size_t M, size_t N>
-typename std::enable_if<M == 1 || N == 1, double>::type
-norm(const matrix<T, M, N>& m) {
-    double result(0);
-    for(const auto& e : m) result += e * e;
-    return std::sqrt(result);
-}
-
-template<typename IterType, typename VecType>
-double norm(const vector_ref<IterType, VecType>& v) {
-    return std::sqrt(v * v);
-}
+typedef detail::quaternion<double> quat;
+typedef detail::quaternion<float> fquat;
 
 template<typename T, size_t M, size_t N>
 matrix<T, N, M> transpose(const matrix<T, M, N>& m_) {
@@ -761,13 +816,36 @@ inverse(const matrix<T, M, M>& m_) {
 
 template<typename T, size_t M, size_t N, size_t P, size_t Q>
 typename std::enable_if<
-    detail::mpl_min__(M, N) == 1 && detail::mpl_min__(P, Q) &&
+    detail::mpl_min__(M, N) == 1 && detail::mpl_min__(P, Q) == 1 &&
     detail::mpl_max__(M, N) == detail::mpl_max__(P, Q), T>::type
 dot(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
     T sum(0);
-    for(auto i1 = v1.begin(), i2 = v2.begin(); i1 != v1.end(); ++i1, ++i2)
-        sum += (*i1) * (*i2);
+    const T* src1 = v1.data();
+    const T* src2 = v2.data();
+
+    for(size_t i = 0; i < M * N; i++)
+        sum += src1[i] * src2[i];
+
     return sum;
+}
+
+template<typename T, size_t M, size_t N>
+typename std::enable_if<M == 1 || N == 1, double>::type
+norm(const matrix<T, M, N>& m) {
+    return std::sqrt(dot(m, m));
+}
+
+template<typename IterType, typename VecType>
+double norm(const vector_ref<IterType, VecType>& v) {
+    return std::sqrt(v * v);
+}
+
+template<typename T>
+double norm(const detail::quaternion<T>& q) {
+    double sum = 0;
+    for(size_t i = 0; i < 4; i++)
+        sum += q[i] * q[i];
+    return std::sqrt(sum);
 }
 
 template<typename T, size_t M, size_t N, size_t P, size_t Q>
@@ -790,6 +868,16 @@ cross(const matrix<T, M, N>& v1, const matrix<T, P, Q>& v2) {
             v2[0], v2[1],
         });
     return res;
+}
+
+template<typename T>
+typename std::enable_if<std::is_scalar<T>::value, T>::type
+clamp(T v, T min_v, T max_v) {
+    return v < min_v ? min_v : v > max_v ? max_v : v;
+}
+
+inline bool close_to(double a, double b) {
+    return std::abs(a - b) < 1e-8;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -952,8 +1040,38 @@ inline matrix<T, 4, 4> scale(T x, T y, T z)
     { return diagonal({x, y, z, 1}); }
 
 template<typename T = double>
-inline matrix<T, 4, 4> identity()
-    { return diagonal({1, 1, 1, 1}); }
+inline matrix<T, 4, 4> scale(col<T, 3> s)
+    { return diagonal({s[0], s[1], s[2], 1}); }
+
+template<size_t M = 4, typename T = double>
+inline matrix<T, M, M> identity() {
+    matrix<T, M, M> m;
+    double* buf = m.data();
+    for(int i = 0; i < M; i++)
+        buf[i * M + i] = 1;
+    return m;
+}
+
+template<typename T = double>
+inline matrix<T, 4, 4> rotate(quat q)
+{
+    mat4 m = identity<4, T>() +
+        matrix<T, 4, 4> {
+            - q[1] * q[1] - q[2] * q[2], q[0] * q[1], q[0] * q[2], 0,
+            q[0] * q[1], - q[0] * q[0] - q[2] * q[2], q[1] * q[2], 0,
+            q[0] * q[2], q[1] * q[2], - q[0] * q[0] - q[1] * q[1], 0,
+            0, 0, 0, 1,
+        } * 2 +
+        matrix<T, 4, 4> {
+            0, -q[2], q[1], 0,
+            q[2], 0, -q[0], 0,
+            -q[1], q[0], 0, 0,
+            0, 0, 0, 1,
+        } * 2 * q[3];
+    m.at(3, 3) = 1;
+
+    return m;
+}
 
 template<typename T = double>
 inline matrix<T, 4, 4> perspective(double fov, double wh, double zn, double zf)

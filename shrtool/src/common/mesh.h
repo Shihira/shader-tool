@@ -29,6 +29,8 @@ private:
     }
 
 public:
+    std::string name;
+
     typedef void mesh_tag;
     /*
      * // provide at least these member variables as follow
@@ -75,11 +77,13 @@ public:
     mesh_basic() { }
 
     mesh_basic(mesh_basic&& mp) :
+        mesh_base<mesh_basic>(std::move(mp)),
         positions(std::move(mp.positions)),
         normals(std::move(mp.normals)),
         uvs(std::move(mp.uvs)) { }
 
     mesh_basic(const mesh_basic& mp) :
+        mesh_base<mesh_basic>(mp),
         positions(mp.positions),
         normals(mp.normals),
         uvs(mp.uvs) { }
@@ -167,10 +171,14 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
     stor_ptr<math::col4> stor_positions;
     stor_ptr<math::col3> stor_normals;
     stor_ptr<math::col3> stor_uvs;
+    stor_ptr<math::col4> stor_weights;
+    stor_ptr<math::col4> stor_bone_indices;
 
     indexed_attr<math::col4, stor_ptr<math::col4>> positions;
     indexed_attr<math::col3, stor_ptr<math::col3>> normals;
     indexed_attr<math::col3, stor_ptr<math::col3>> uvs;
+    indexed_attr<math::col4, stor_ptr<math::col4>> weights;
+    indexed_attr<math::col4, stor_ptr<math::col4>> bone_indices;
 
     bool has_positions() const {
         return
@@ -193,33 +201,62 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
             uvs.size() > 0;
     }
 
+    bool has_weights() const {
+        return
+            stor_weights &&
+            stor_weights->size() &&
+            weights.size() > 0;
+    }
+
+    bool has_bone_indices() const {
+        return
+            stor_bone_indices &&
+            stor_bone_indices->size() &&
+            bone_indices.size() > 0;
+    }
+
     // default constructor: initialize storage
     mesh_indexed(bool init_stor = true) :
         positions(stor_positions),
         normals(stor_normals),
-        uvs(stor_uvs) {
+        uvs(stor_uvs),
+        weights(stor_weights),
+        bone_indices(stor_bone_indices)
+    {
         if(init_stor) {
             stor_positions.reset(new std::vector<math::col4>);
             stor_normals.reset(new std::vector<math::col3>);
             stor_uvs.reset(new std::vector<math::col3>);
+            stor_weights.reset(new std::vector<math::col4>);
+            stor_bone_indices.reset(new std::vector<math::col4>);
         }
     }
 
     mesh_indexed(const mesh_indexed& im) :
+        mesh_base<mesh_indexed>(im),
         stor_positions(im.stor_positions),
         stor_normals(im.stor_normals),
         stor_uvs(im.stor_uvs),
+        stor_weights(im.stor_weights),
+        stor_bone_indices(im.stor_bone_indices),
         positions(stor_positions, im.positions.indices),
         normals(stor_normals, im.normals.indices),
-        uvs(stor_uvs, im.uvs.indices) { }
+        uvs(stor_uvs, im.uvs.indices),
+        weights(stor_weights, im.weights.indices),
+        bone_indices(stor_bone_indices, im.bone_indices.indices) { }
 
     mesh_indexed(mesh_indexed&& im) :
+        mesh_base<mesh_indexed>(std::move(im)),
         stor_positions(std::move(im.stor_positions)),
         stor_normals(std::move(im.stor_normals)),
         stor_uvs(std::move(im.stor_uvs)),
+        stor_weights(std::move(im.stor_weights)),
+        stor_bone_indices(std::move(im.stor_bone_indices)),
         positions(stor_positions, std::move(im.positions.indices)),
         normals(stor_normals, std::move(im.normals.indices)),
-        uvs(stor_uvs, std::move(im.uvs.indices)) { }
+        uvs(stor_uvs, std::move(im.uvs.indices)),
+        weights(stor_weights, std::move(im.weights.indices)),
+        bone_indices(stor_bone_indices, std::move(im.bone_indices.indices)) { }
 
     static mesh_indexed gen_uv_sphere(double radius,
             size_t tesel_u, size_t tesel_v, bool smooth = true);
@@ -238,8 +275,8 @@ struct mesh_indexed : mesh_base<mesh_indexed> {
             .function("gen_uv_sphere", gen_uv_sphere)
             .function("gen_box", gen_box)
             .function("gen_plane", gen_plane)
-            .function("get_position", static_cast<math::col4& (mesh_indexed::*) (size_t, size_t)>(&mesh_indexed::get_position))
-            .function("get_normals", static_cast<math::col3& (mesh_indexed::*) (size_t, size_t)>(&mesh_indexed::get_normal))
+            .function("get_position", static_cast<math::col4& (mesh_indexed::*)(size_t, size_t)>(&mesh_indexed::get_position))
+            .function("get_normals", static_cast<math::col3& (mesh_indexed::*)(size_t, size_t)>(&mesh_indexed::get_normal))
             .function("get_uv", static_cast<math::col3& (mesh_indexed::*) (size_t, size_t)>(&mesh_indexed::get_uv));
     }
 };
@@ -318,6 +355,12 @@ struct attr_trait<T, typename T::mesh_tag> {
         case 2:
             if(i.has_uvs()) return 2;
             break;
+        case 3:
+            if(i.has_weights()) return 3;
+            break;
+        case 4:
+            if(i.has_bone_indices()) return 4;
+            break;
         }
 
         return -1;
@@ -328,7 +371,7 @@ struct attr_trait<T, typename T::mesh_tag> {
     }
 
     static int dim(const input_type& i, size_t i_s) {
-        static const int dims[3] = { 4, 3, 3, };
+        static const int dims[5] = { 4, 3, 3, 4, 4 };
         return dims[i_s];
     }
 
@@ -345,6 +388,8 @@ struct attr_trait<T, typename T::mesh_tag> {
         case 0: copy_cols(i.positions, data); break;
         case 1: copy_cols(i.normals, data); break;
         case 2: copy_cols(i.uvs, data); break;
+        case 3: copy_cols(i.weights, data); break;
+        case 4: copy_cols(i.bone_indices, data); break;
         }
     }
 };
@@ -357,6 +402,19 @@ inline math::col4 find_average(const T& m)
         sum += m.positions[i];
     }
     return sum / double(attr_trait<T>::count(m));
+}
+
+template<typename T>
+inline math::col4 find_average(const std::vector<T>& v)
+{
+    math::col4 sum = { 0, 0, 0, 0 };
+    size_t sum_count = 0;
+    for(const T& m : v) {
+        for(int i = 0; i < attr_trait<T>::count(m); i++)
+            sum += m.positions[i];
+        sum_count += attr_trait<T>::count(m);
+    }
+    return sum / double(sum_count);
 }
 
 }

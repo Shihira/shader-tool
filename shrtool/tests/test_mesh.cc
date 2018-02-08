@@ -57,11 +57,11 @@ TEST_CASE(test_load_pnu_rectangle) {
     assert_equal_print(m.stor_uvs->size(), 4u);
 
     assert_equal_print(cross(
-            (m.positions[1] - m.positions[0]).cutdown<col3>(),
-            (m.positions[2] - m.positions[1]).cutdown<col3>()), m.normals[0]);
+            col3(m.positions[1] - m.positions[0]),
+            col3(m.positions[2] - m.positions[1])), m.normals[0]);
     assert_equal_print(cross(
-            (m.positions[4] - m.positions[3]).cutdown<col3>(),
-            (m.positions[5] - m.positions[4]).cutdown<col3>()), m.normals[3]);
+            col3(m.positions[4] - m.positions[3]),
+            col3(m.positions[5] - m.positions[4])), m.normals[3]);
     assert_equal_print(meshes[0].uvs[0], col3({ 0, 0, 0 }));
     assert_equal_print(meshes[0].uvs[3], col3({ 0, 1, 0 }));
 }
@@ -85,12 +85,12 @@ TEST_CASE(test_load_rectangle) {
     assert_equal_print(m.normals.size(), 6u);
 
     assert_equal_print(cross(
-            (m.positions[1] - m.positions[0]).cutdown<col3>(),
-            (m.positions[2] - m.positions[1]).cutdown<col3>()),
+            col3(m.positions[1] - m.positions[0]),
+            col3(m.positions[2] - m.positions[1])),
             m.stor_normals->at(0));
     assert_equal_print(cross(
-            (m.positions[4] - m.positions[3]).cutdown<col3>(),
-            (m.positions[5] - m.positions[4]).cutdown<col3>()),
+            col3(m.positions[4] - m.positions[3]),
+            col3(m.positions[5] - m.positions[4])),
             m.stor_normals->at(0));
 }
 
@@ -130,7 +130,7 @@ TEST_CASE(test_uv_sphere) {
     for(size_t i = 0; i < us.triangles(); ++i) {
         for(size_t j = 0; j < 3; ++j) {
             assert_float_close(
-                norm(us.get_position(i, j).cutdown<col3>()),
+                norm(col3(us.get_position(i, j))),
                 2, 0.00001);
             assert_float_close(
                 norm(us.get_normal(i, j)),
@@ -139,8 +139,8 @@ TEST_CASE(test_uv_sphere) {
         }
 
         float area = norm(cross(
-            (us.get_position(i, 1) - us.get_position(i, 0)).cutdown<fcol3>(),
-            (us.get_position(i, 2) - us.get_position(i, 1)).cutdown<fcol3>()));
+            fcol3(us.get_position(i, 1) - us.get_position(i, 0)),
+            fcol3(us.get_position(i, 2) - us.get_position(i, 1))));
         assert_true(area > 0.000001);
     }
 }
@@ -150,8 +150,8 @@ TEST_CASE(test_plane) {
 
     for(size_t t = 0; t < pl.triangles(); t++) {
         double res = norm(cross(
-            (pl.get_position(t, 1) - pl.get_position(t, 0)).cutdown<col3>(),
-            (pl.get_position(t, 2) - pl.get_position(t, 1)).cutdown<col3>()));
+            col3(pl.get_position(t, 1) - pl.get_position(t, 0)),
+            col3(pl.get_position(t, 2) - pl.get_position(t, 1))));
         assert_true(res > 0.000001);
     }
 }

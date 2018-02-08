@@ -84,7 +84,7 @@ public:
         base_type(std::move(s)), data(std::forward<Args>(args)...) { }
 
     basic_res_object(basic_res_object&& obj) :
-        base_type(std::move(obj.name_type)), data(std::move(obj)) { }
+        base_type(std::move(obj.name)), data(std::move(obj)) { }
 
     operator value_type&() { return data; }
     operator const value_type&() const { return data; }

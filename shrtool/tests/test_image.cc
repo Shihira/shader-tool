@@ -8,8 +8,6 @@ using namespace shrtool::unit_test;
 TEST_CASE(test_image_interface) {
     image im;
 
-    assert_except(im.data(), restriction_error);
-
     im = image(2, 2);
     im.pixel(4, 5) = color(0xff567890);
 

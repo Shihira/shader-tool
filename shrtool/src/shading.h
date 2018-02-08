@@ -67,7 +67,7 @@ protected:
 
 public:
 
-    PROPERTY_RW(color, bgcolor)
+    PROPERTY_RW(fcolor, bgcolor)
     PROPERTY_RW(float, infdepth)
     PROPERTY_RW(bool, depth_test)
     PROPERTY_RW(bool, wire_frame)
@@ -193,7 +193,9 @@ public:
     void property(size_t binding,
             const render_assets::texture& tex);
     void target(render_target& tgt) { target_ = &tgt; }
+
     void draw(const vertex_attr_vector& vat) const;
+    void draw(const vertex_attr_vector& vat, size_t count) const;
 
     void link();
 
